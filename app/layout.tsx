@@ -2,9 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Arcanum - Private Messaging on Arc',
-  description: 'Fully on-chain private messenger on Arc Network',
-  icons: { icon: '/favicon.ico' },
+  title: 'Arcanum',
+  description: 'Private on-chain messaging on Arc Network',
 };
 
 export default function RootLayout({

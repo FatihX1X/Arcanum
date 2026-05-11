@@ -26,7 +26,7 @@ export default function WalletConnect() {
           onClick={() => connect({ connector: injected() })}
           className="bg-white hover:bg-zinc-100 text-black px-12 py-5 rounded-3xl text-xl font-semibold transition w-full max-w-md"
         >
-          Cüzdanı Bağla
+          Cüzdanı Bağla (MetaMask / Rabby)
         </button>
       )}
     </div>
