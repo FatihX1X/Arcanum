@@ -19,8 +19,48 @@ body {
   min-height: 100%;
   margin: 0;
   background: #09090b;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
 }
 
 ::selection {
   background: rgba(52, 211, 153, 0.35);
+}
+
+@layer components {
+  .panel {
+    @apply rounded-lg border border-zinc-800 bg-zinc-950/95 p-4 shadow-xl shadow-black/20 sm:p-5;
+  }
+
+  .panel-header {
+    @apply flex flex-col gap-3 border-b border-zinc-800 pb-4 sm:flex-row sm:items-start sm:justify-between;
+  }
+
+  .panel-title {
+    @apply mt-1 text-lg font-semibold tracking-tight text-white;
+  }
+
+  .eyebrow {
+    @apply text-xs font-medium uppercase tracking-[0.16em] text-zinc-500;
+  }
+
+  .input {
+    @apply w-full rounded-md border border-zinc-800 bg-zinc-950 px-3.5 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-emerald-400 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  input.input {
+    @apply h-11;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-md bg-emerald-400 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-md border border-zinc-700 text-sm font-medium text-zinc-200 transition hover:border-zinc-500 hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .helper-warning {
+    @apply text-sm text-amber-300;
+  }
 }
