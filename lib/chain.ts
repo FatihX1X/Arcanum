@@ -28,6 +28,18 @@ export const arcNetworkTestnet = defineChain({
   testnet: true,
 });
 
+export function arcAddEthereumChainParams() {
+  const explorerUrl = arcNetworkTestnet.blockExplorers?.default.url;
+
+  return {
+    chainId: `0x${arcNetworkTestnet.id.toString(16)}`,
+    chainName: arcNetworkTestnet.name,
+    nativeCurrency: arcNetworkTestnet.nativeCurrency,
+    rpcUrls: [...arcNetworkTestnet.rpcUrls.default.http],
+    blockExplorerUrls: explorerUrl ? [explorerUrl] : undefined,
+  };
+}
+
 export function transactionUrl(hash: string) {
   const baseUrl = arcNetworkTestnet.blockExplorers?.default.url.replace(/\/$/, '');
   return baseUrl ? `${baseUrl}/tx/${hash}` : undefined;
