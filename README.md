@@ -34,6 +34,8 @@ NEXT_PUBLIC_CONTRACT_ADDRESS=0x...
 
 ## Contract Workflow
 
+Fund the deployer wallet with Arc Testnet USDC for gas, then run:
+
 ```bash
 npm run compile:contracts
 npm run test:contracts
