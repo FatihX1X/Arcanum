@@ -1,6 +1,9 @@
 export const arcanumMessengerAddress = (
-  process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '0x8234Bfe1405d1765DE73A8b5d167cd99B74F58fD'
+  process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '0x0000000000000000000000000000000000000000'
 ) as `0x${string}`;
+
+export const isArcanumMessengerConfigured =
+  arcanumMessengerAddress !== '0x0000000000000000000000000000000000000000';
 
 export const arcanumMessengerAbi = [
   {
