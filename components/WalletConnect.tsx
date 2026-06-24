@@ -42,7 +42,16 @@ import {
   publicMessageFee,
   type ChainMessage,
 } from '../lib/contract';
-import { decryptMessage, encryptMessage, ensureEncryptionKeyPair, exportEncryptionKey, importEncryptionKey } from '../lib/crypto';
+import {
+  decryptMessage,
+  encryptMessage,
+  ensureEncryptionKeyPair,
+  exportEncryptionKey,
+  hasStoredEncryptionKey,
+  importEncryptionKey,
+  isEncryptionKeyUnlocked,
+  unlockEncryptionKey,
+} from '../lib/crypto';
 import { copy, type Language } from './arcanumCopy';
 
 type PrivacyMode = 'private' | 'public';
@@ -124,6 +133,8 @@ export default function WalletConnect() {
   const [lastHash, setLastHash] = useState<`0x${string}` | undefined>();
   const [pendingRecipient, setPendingRecipient] = useState<`0x${string}` | ''>('');
   const [autoSwitchedFor, setAutoSwitchedFor] = useState('');
+  const [localKeyStored, setLocalKeyStored] = useState(false);
+  const [localKeyUnlocked, setLocalKeyUnlocked] = useState(false);
 
   const t = copy[language];
   const connector = connectors.find((item) => item.id === 'injected') ?? connectors[0];
@@ -188,6 +199,10 @@ export default function WalletConnect() {
   }, []);
 
   useEffect(() => {
+    refreshLocalKeyStatus();
+  }, [address]);
+
+  useEffect(() => {
     if (!isConnected || !address || isCorrectChain || autoSwitchedFor === address) {
       return;
     }
@@ -219,6 +234,40 @@ export default function WalletConnect() {
     localStorage.setItem('arcanum.language', next);
   }
 
+  function refreshLocalKeyStatus() {
+    if (!address) {
+      setLocalKeyStored(false);
+      setLocalKeyUnlocked(false);
+      return;
+    }
+
+    setLocalKeyStored(hasStoredEncryptionKey(address));
+    setLocalKeyUnlocked(isEncryptionKeyUnlocked(address));
+  }
+
+  async function unlockLocalKey() {
+    if (!address) {
+      return;
+    }
+
+    const passphrase = window.prompt(t.key.unlockPrompt);
+    if (!passphrase) {
+      return;
+    }
+
+    try {
+      await unlockEncryptionKey(address, passphrase);
+      refreshLocalKeyStatus();
+      setTone('success');
+      setStatus(t.status.unlocked);
+      setFlowError('');
+    } catch (error) {
+      setTone('error');
+      setStatus(t.status.unlockFailed);
+      setFlowError(error instanceof Error ? error.message : t.status.unlockFailed);
+    }
+  }
+
   async function switchToArc() {
     setFlowError('');
     try {
@@ -241,9 +290,15 @@ export default function WalletConnect() {
     }
 
     try {
+      const passphrase = window.prompt(localKeyStored ? t.key.unlockPrompt : t.key.createPrompt);
+      if (!passphrase) {
+        return;
+      }
+
       setTone('pending');
       setStatus(t.status.preparingKey);
-      const keys = await ensureEncryptionKeyPair(address);
+      const keys = await ensureEncryptionKeyPair(address, passphrase);
+      refreshLocalKeyStatus();
       setStatus(t.status.wallet);
       const hash = await writeContractAsync({
         address: arcanumMessengerAddress,
@@ -282,6 +337,7 @@ export default function WalletConnect() {
       setTone('success');
       setStatus(t.status.exported);
       setFlowError('');
+      refreshLocalKeyStatus();
     } catch (error) {
       setTone('error');
       setStatus(t.status.backupFailed);
@@ -301,8 +357,10 @@ export default function WalletConnect() {
 
     try {
       const imported = await importEncryptionKey(address, await file.text(), passphrase);
-      await refetchOwnKey();
-      const matchesOnChain = !ownKey || String(ownKey) === imported.publicKey;
+      const latestOwnKey = await refetchOwnKey();
+      const chainKey = String(latestOwnKey.data ?? ownKey ?? '');
+      const matchesOnChain = !chainKey || chainKey === imported.publicKey;
+      refreshLocalKeyStatus();
       setTone(matchesOnChain ? 'success' : 'error');
       setStatus(matchesOnChain ? t.status.imported : t.status.mismatch);
       setFlowError(matchesOnChain ? '' : t.status.mismatch);
@@ -327,8 +385,27 @@ export default function WalletConnect() {
       setTone('pending');
       setFlowError('');
       setStatus(privacy === 'private' ? t.status.encrypting : t.status.preparingMessage);
+      let passphrase: string | undefined;
+      if (privacy === 'private' && address && !isEncryptionKeyUnlocked(address)) {
+        passphrase = window.prompt(hasStoredEncryptionKey(address) ? t.key.unlockPrompt : t.key.createPrompt) ?? undefined;
+        if (!passphrase) {
+          setTone('idle');
+          setStatus('');
+          return;
+        }
+      }
       const payload =
-        privacy === 'private' ? await encryptMessage(trimmedMessage, String(recipientKey), address as `0x${string}`) : trimmedMessage;
+        privacy === 'private'
+          ? await encryptMessage(
+              trimmedMessage,
+              String(recipientKey),
+              address as `0x${string}`,
+              activeRecipient as `0x${string}`,
+              { chainId: arcNetworkTestnet.id, contractAddress: arcanumMessengerAddress },
+              passphrase,
+            )
+          : trimmedMessage;
+      refreshLocalKeyStatus();
       setStatus(t.status.wallet);
       const hash = await writeContractAsync({
         address: arcanumMessengerAddress,
@@ -476,7 +553,17 @@ export default function WalletConnect() {
                 <p className="eyebrow">{t.dm.title}</p>
                 <h2 className="panel-title truncate font-mono">{recipientValid && !recipientSelf ? short(activeRecipient) : t.dm.choose}</h2>
               </div>
-              <KeyActions t={t} hasKey={hasOwnKey} disabled={!isConnected || !isCorrectChain || isWritePending} onRegister={registerKey} onExport={exportKey} onImport={importKey} />
+              <KeyActions
+                t={t}
+                hasKey={hasOwnKey}
+                hasLocalKey={localKeyStored}
+                localUnlocked={localKeyUnlocked}
+                disabled={!isConnected || !isCorrectChain || isWritePending}
+                onRegister={registerKey}
+                onUnlock={unlockLocalKey}
+                onExport={exportKey}
+                onImport={importKey}
+              />
             </div>
 
             <div className="mt-4 flex min-h-[320px] flex-1 flex-col gap-3 overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-950 p-3">
@@ -549,21 +636,35 @@ export default function WalletConnect() {
 function KeyActions({
   t,
   hasKey,
+  hasLocalKey,
+  localUnlocked,
   disabled,
   onRegister,
+  onUnlock,
   onExport,
   onImport,
 }: {
   t: (typeof copy)[Language];
   hasKey: boolean;
+  hasLocalKey: boolean;
+  localUnlocked: boolean;
   disabled: boolean;
   onRegister: () => void;
+  onUnlock: () => void;
   onExport: () => void;
   onImport: (file: File) => void;
 }) {
   return (
     <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
       <Pill tone={hasKey ? 'success' : 'warning'} icon={<KeyRound size={13} />} label={hasKey ? t.key.ok : t.key.needed} />
+      {hasLocalKey ? (
+        <Pill tone={localUnlocked ? 'success' : 'warning'} icon={<Lock size={13} />} label={localUnlocked ? t.key.localReady : t.key.locked} />
+      ) : null}
+      {hasLocalKey && !localUnlocked ? (
+        <button type="button" disabled={disabled} onClick={onUnlock} className="btn-ghost h-9 px-3 text-xs">
+          {t.key.unlock}
+        </button>
+      ) : null}
       {!hasKey ? (
         <button type="button" disabled={disabled} onClick={onRegister} className="btn-ghost h-9 px-3 text-xs">
           {t.key.register}
@@ -699,26 +800,27 @@ function MessageCard({
 
 function MessageText({ message, viewer, t }: { message: ChainMessage; viewer?: `0x${string}`; t: (typeof copy)[Language] }) {
   const [decrypted, setDecrypted] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failure, setFailure] = useState<'key' | 'decrypt' | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     async function run() {
       if (!message.isPrivate || !viewer) {
         setDecrypted(null);
-        setFailed(false);
+        setFailure(null);
         return;
       }
       try {
         const value = await decryptMessage(message.payload, viewer);
         if (!cancelled) {
           setDecrypted(value);
-          setFailed(false);
+          setFailure(null);
         }
-      } catch {
+      } catch (error) {
         if (!cancelled) {
+          const code = error instanceof Error ? error.message : '';
           setDecrypted(null);
-          setFailed(true);
+          setFailure(['NO_LOCAL_KEY', 'LOCAL_KEY_LOCKED', 'LOCAL_KEY_REQUIRES_MIGRATION'].includes(code) ? 'key' : 'decrypt');
         }
       }
     }
@@ -731,7 +833,11 @@ function MessageText({ message, viewer, t }: { message: ChainMessage; viewer?: `
   return (
     <div>
       <p className="whitespace-pre-wrap break-words text-sm leading-6 text-zinc-100">{message.isPrivate ? decrypted ?? t.dm.encrypted : message.payload}</p>
-      {failed ? <p className="mt-3 rounded-md border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-sm text-amber-200">{t.dm.decryptFailed}</p> : null}
+      {failure ? (
+        <p className="mt-3 rounded-md border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-sm text-amber-200">
+          {failure === 'key' ? t.dm.keyRequired : t.dm.decryptFailed}
+        </p>
+      ) : null}
     </div>
   );
 }
