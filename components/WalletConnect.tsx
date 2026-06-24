@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, type ReactNode, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -615,7 +615,7 @@ function FieldLabel({ htmlFor, label }: { htmlFor: string; label: string }) {
   );
 }
 
-function ModeButton({ active, disabled, icon, label, onClick }: { active: boolean; disabled: boolean; icon: React.ReactNode; label: string; onClick: () => void }) {
+function ModeButton({ active, disabled, icon, label, onClick }: { active: boolean; disabled: boolean; icon: ReactNode; label: string; onClick: () => void }) {
   return (
     <button type="button" disabled={disabled} onClick={onClick} className={`inline-flex h-11 items-center justify-center gap-2 rounded-md text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${active ? 'bg-white text-zinc-950' : 'text-zinc-300 hover:bg-zinc-800'}`}>
       {icon}
@@ -624,7 +624,7 @@ function ModeButton({ active, disabled, icon, label, onClick }: { active: boolea
   );
 }
 
-function TabButton({ active, icon, label, onClick }: { active: boolean; icon: React.ReactNode; label: string; onClick: () => void }) {
+function TabButton({ active, icon, label, onClick }: { active: boolean; icon: ReactNode; label: string; onClick: () => void }) {
   return (
     <button type="button" onClick={onClick} className={`inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium transition ${active ? 'bg-white text-zinc-950' : 'text-zinc-400 hover:bg-zinc-800'}`}>
       {icon}
@@ -633,7 +633,7 @@ function TabButton({ active, icon, label, onClick }: { active: boolean; icon: Re
   );
 }
 
-function StatusPill({ tone, icon, label }: { tone: 'neutral' | 'success' | 'warning' | 'info'; icon?: React.ReactNode; label: string }) {
+function StatusPill({ tone, icon, label }: { tone: 'neutral' | 'success' | 'warning' | 'info'; icon?: ReactNode; label: string }) {
   const toneClass = {
     neutral: 'border-zinc-700 bg-zinc-900 text-zinc-300',
     success: 'border-emerald-400/25 bg-emerald-400/10 text-emerald-200',
