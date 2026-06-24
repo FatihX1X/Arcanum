@@ -2,7 +2,9 @@
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import {
+  AlertTriangle,
   CheckCircle2,
+  Clock3,
   ExternalLink,
   Inbox,
   KeyRound,
@@ -11,6 +13,7 @@ import {
   Send,
   Shield,
   Wallet,
+  Wifi,
   X,
 } from 'lucide-react';
 import {
@@ -25,11 +28,17 @@ import {
 } from 'wagmi';
 import { isAddress, zeroAddress } from 'viem';
 import { arcNetworkTestnet, transactionUrl } from '../lib/chain';
-import { arcanumMessengerAbi, arcanumMessengerAddress, type ChainMessage } from '../lib/contract';
+import {
+  arcanumMessengerAbi,
+  arcanumMessengerAddress,
+  isArcanumMessengerConfigured,
+  type ChainMessage,
+} from '../lib/contract';
 import { decryptMessage, encryptMessage, ensureEncryptionKeyPair } from '../lib/crypto';
 
 type PrivacyMode = 'private' | 'public';
 type TabMode = 'inbox' | 'sent';
+type NoticeTone = 'idle' | 'pending' | 'success' | 'error';
 
 function shortenAddress(address: string) {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
@@ -55,8 +64,10 @@ export default function WalletConnect() {
   const [privacy, setPrivacy] = useState<PrivacyMode>('private');
   const [tab, setTab] = useState<TabMode>('inbox');
   const [status, setStatus] = useState('');
+  const [noticeTone, setNoticeTone] = useState<NoticeTone>('idle');
   const [flowError, setFlowError] = useState('');
   const [pendingHash, setPendingHash] = useState<`0x${string}` | undefined>();
+  const [lastTxHash, setLastTxHash] = useState<`0x${string}` | undefined>();
 
   const injectedConnector = connectors[0];
   const normalizedRecipient = recipient.trim();
@@ -71,7 +82,7 @@ export default function WalletConnect() {
     functionName: 'encryptionKeys',
     args: [connectedAddress],
     query: {
-      enabled: isConnected,
+      enabled: isConnected && isArcanumMessengerConfigured,
     },
   });
 
@@ -81,7 +92,7 @@ export default function WalletConnect() {
     functionName: 'encryptionKeys',
     args: [recipientIsValid ? (normalizedRecipient as `0x${string}`) : zeroAddress],
     query: {
-      enabled: isConnected && privacy === 'private' && recipientIsValid,
+      enabled: isConnected && isArcanumMessengerConfigured && privacy === 'private' && recipientIsValid,
     },
   });
 
@@ -95,7 +106,7 @@ export default function WalletConnect() {
     functionName: 'getInbox',
     args: [connectedAddress],
     query: {
-      enabled: isConnected,
+      enabled: isConnected && isArcanumMessengerConfigured,
     },
   });
 
@@ -109,7 +120,7 @@ export default function WalletConnect() {
     functionName: 'getOutbox',
     args: [connectedAddress],
     query: {
-      enabled: isConnected,
+      enabled: isConnected && isArcanumMessengerConfigured,
     },
   });
 
@@ -121,12 +132,20 @@ export default function WalletConnect() {
   });
 
   const canSend = useMemo(() => {
-    return isConnected && isCorrectChain && recipientIsValid && normalizedMessage.length > 0 && !isWritePending;
+    return (
+      isConnected &&
+      isArcanumMessengerConfigured &&
+      isCorrectChain &&
+      recipientIsValid &&
+      normalizedMessage.length > 0 &&
+      !isWritePending
+    );
   }, [isConnected, isCorrectChain, recipientIsValid, normalizedMessage.length, isWritePending]);
 
   useEffect(() => {
     if (receipt.isSuccess) {
       setStatus('İşlem onaylandı. Mesaj zincire yazıldı.');
+      setNoticeTone('success');
       setMessage('');
       setPendingHash(undefined);
       void refetchInbox();
@@ -136,11 +155,12 @@ export default function WalletConnect() {
   }, [receipt.isSuccess, refetchInbox, refetchOwnKey, refetchSent]);
 
   async function handleRegisterKey() {
-    if (!address || !isCorrectChain) {
+    if (!address || !isCorrectChain || !isArcanumMessengerConfigured) {
       return;
     }
 
     setFlowError('');
+    setNoticeTone('pending');
     setStatus('Şifreleme anahtarı hazırlanıyor...');
 
     try {
@@ -154,8 +174,10 @@ export default function WalletConnect() {
       });
 
       setPendingHash(hash);
+      setLastTxHash(hash);
       setStatus('Anahtar kayıt işlemi zincirde bekliyor...');
     } catch (error) {
+      setNoticeTone('error');
       setFlowError(error instanceof Error ? error.message : 'Anahtar kaydı başarısız oldu.');
       setStatus('');
     }
@@ -169,11 +191,13 @@ export default function WalletConnect() {
     }
 
     if (privacy === 'private' && !recipientEncryptionKey) {
+      setNoticeTone('error');
       setFlowError('Alıcının şifreleme anahtarı yok. Alıcı önce Arcanum’a kayıt olmalı.');
       return;
     }
 
     setFlowError('');
+    setNoticeTone('pending');
     setStatus(privacy === 'private' ? 'Mesaj browser içinde şifreleniyor...' : 'Mesaj hazırlanıyor...');
 
     try {
@@ -191,8 +215,10 @@ export default function WalletConnect() {
       });
 
       setPendingHash(hash);
+      setLastTxHash(hash);
       setStatus('İşlem zincirde bekliyor...');
     } catch (error) {
+      setNoticeTone('error');
       setFlowError(error instanceof Error ? error.message : 'Mesaj gönderilemedi.');
       setStatus('');
     }
@@ -200,236 +226,309 @@ export default function WalletConnect() {
 
   const visibleMessages = (tab === 'inbox' ? inboxMessages : sentMessages) as ChainMessage[] | undefined;
   const isFetchingMessages = tab === 'inbox' ? isInboxFetching : isSentFetching;
-  const latestTxUrl = pendingHash ? transactionUrl(pendingHash) : undefined;
+  const latestTxUrl = lastTxHash ? transactionUrl(lastTxHash) : undefined;
+  const privateRecipientMissing = privacy === 'private' && recipientIsValid && !recipientEncryptionKey;
+  const errorMessages = [flowError, connectError?.message, switchError?.message, writeError?.message].filter(Boolean) as string[];
 
   return (
-    <section className="mx-auto w-full max-w-4xl rounded-lg border border-zinc-800 bg-zinc-950/90 shadow-2xl shadow-black/25">
-      <div className="border-b border-zinc-800 p-5 sm:p-6">
-        {isConnected && address ? (
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-300">
-                <CheckCircle2 size={20} aria-hidden="true" />
-              </span>
-              <div>
-                <p className="text-sm text-zinc-400">Cüzdan bağlı</p>
-                <p className="font-mono text-sm text-zinc-100">{shortenAddress(address)}</p>
-              </div>
-            </div>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              {!isCorrectChain ? (
-                <button
-                  type="button"
-                  onClick={() => switchChain({ chainId: arcNetworkTestnet.id })}
-                  disabled={isSwitchPending}
-                  className="inline-flex h-10 items-center justify-center rounded-md bg-amber-300 px-4 text-sm font-semibold text-zinc-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {isSwitchPending ? 'Ağ değiştiriliyor...' : 'Arc Network’e geç'}
-                </button>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => disconnect()}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-zinc-700 px-4 text-sm font-medium text-zinc-200 transition hover:border-zinc-500 hover:bg-zinc-900"
-              >
-                <X size={16} aria-hidden="true" />
-                Bağlantıyı kes
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center gap-4 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-white text-zinc-950">
-              <Wallet size={22} aria-hidden="true" />
-            </div>
-            <div>
-              <h2 className="text-xl font-semibold text-white">Arcanum Messenger</h2>
-              <p className="mt-1 text-sm text-zinc-400">On-chain mesajlaşmak için cüzdanını bağla.</p>
-            </div>
-            <button
-              type="button"
-              disabled={!injectedConnector || isConnectPending}
-              onClick={() => injectedConnector && connect({ connector: injectedConnector })}
-              className="inline-flex h-12 w-full max-w-xs items-center justify-center gap-2 rounded-md bg-white px-5 text-sm font-semibold text-zinc-950 transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <Wallet size={18} aria-hidden="true" />
-              {isConnectPending ? 'Bağlanıyor...' : 'Cüzdanı Bağla'}
-            </button>
-          </div>
-        )}
+    <section className="mx-auto w-full max-w-6xl">
+      <AppHeader
+        address={address}
+        isConnected={isConnected}
+        isCorrectChain={isCorrectChain}
+        isConnectPending={isConnectPending}
+        isSwitchPending={isSwitchPending}
+        connectorReady={Boolean(injectedConnector)}
+        onConnect={() => injectedConnector && connect({ connector: injectedConnector })}
+        onDisconnect={() => disconnect()}
+        onSwitchChain={() => switchChain({ chainId: arcNetworkTestnet.id })}
+      />
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
+        <ComposePanel
+          recipient={recipient}
+          message={message}
+          privacy={privacy}
+          isConnected={isConnected}
+          isCorrectChain={isCorrectChain}
+          isWritePending={isWritePending}
+          canSend={canSend}
+          recipientIsValid={recipientIsValid}
+          privateRecipientMissing={privateRecipientMissing}
+          ownEncryptionKey={String(ownEncryptionKey ?? '')}
+          onRecipientChange={setRecipient}
+          onMessageChange={setMessage}
+          onPrivacyChange={setPrivacy}
+          onRegisterKey={handleRegisterKey}
+          onSubmit={handleSendMessage}
+        />
+
+        <MessagesPanel
+          tab={tab}
+          messages={visibleMessages}
+          viewer={address}
+          isConnected={isConnected}
+          isFetching={isFetchingMessages}
+          onTabChange={setTab}
+          onRefresh={() => (tab === 'inbox' ? refetchInbox() : refetchSent())}
+        />
       </div>
 
-      <div className="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:p-6">
-        <div className="space-y-5">
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/70 p-4">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-white">Şifreleme anahtarı</p>
-                <p className="text-xs text-zinc-500">Gizli mesaj alabilmek için public key zincire kaydedilir.</p>
-              </div>
-              <span className={`rounded-full px-2.5 py-1 text-xs ${ownEncryptionKey ? 'bg-emerald-400/10 text-emerald-200' : 'bg-zinc-800 text-zinc-400'}`}>
-                {ownEncryptionKey ? 'Kayıtlı' : 'Gerekli'}
-              </span>
-            </div>
-            <button
-              type="button"
-              disabled={!isConnected || !isCorrectChain || isWritePending || Boolean(ownEncryptionKey)}
-              onClick={handleRegisterKey}
-              className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-zinc-700 px-4 text-sm font-medium text-zinc-200 transition hover:border-zinc-500 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <KeyRound size={16} aria-hidden="true" />
-              {ownEncryptionKey ? 'Anahtar kayıtlı' : 'Anahtarı oluştur ve kaydet'}
-            </button>
+      <TransactionNotice status={status} tone={noticeTone} errors={errorMessages} txUrl={latestTxUrl} />
+    </section>
+  );
+}
+
+function AppHeader({
+  address,
+  isConnected,
+  isCorrectChain,
+  isConnectPending,
+  isSwitchPending,
+  connectorReady,
+  onConnect,
+  onDisconnect,
+  onSwitchChain,
+}: {
+  address?: `0x${string}`;
+  isConnected: boolean;
+  isCorrectChain: boolean;
+  isConnectPending: boolean;
+  isSwitchPending: boolean;
+  connectorReady: boolean;
+  onConnect: () => void;
+  onDisconnect: () => void;
+  onSwitchChain: () => void;
+}) {
+  return (
+    <header className="rounded-lg border border-zinc-800 bg-zinc-950/95 px-4 py-3 shadow-xl shadow-black/20">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-lg font-semibold tracking-tight text-white">Arcanum</h1>
+            <StatusPill tone="success" icon={<Wifi size={13} aria-hidden="true" />} label="Arc Testnet" />
           </div>
+          <p className="mt-1 max-w-2xl text-sm text-zinc-500">
+            On-chain mesaj gönder, gizli payloadları tarayıcıda şifrele, Inbox ve Sent akışını zincirden oku.
+          </p>
+        </div>
 
-          <form onSubmit={handleSendMessage} className="space-y-5 rounded-lg border border-zinc-800 bg-zinc-900/70 p-4">
-            <div className="space-y-2">
-              <label htmlFor="recipient" className="text-sm font-medium text-zinc-200">
-                Alıcı adresi
-              </label>
-              <input
-                id="recipient"
-                value={recipient}
-                onChange={(event) => setRecipient(event.target.value)}
-                disabled={!isConnected}
-                placeholder="0x..."
-                className="h-12 w-full rounded-md border border-zinc-800 bg-zinc-950 px-4 font-mono text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
-              />
-              {recipient && !recipientIsValid ? <p className="text-sm text-amber-300">Geçerli bir EVM adresi gir.</p> : null}
-            </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <StatusPill
+            tone={isCorrectChain ? 'success' : 'warning'}
+            icon={isCorrectChain ? <CheckCircle2 size={13} aria-hidden="true" /> : <AlertTriangle size={13} aria-hidden="true" />}
+            label={isCorrectChain ? 'Network ready' : 'Wrong network'}
+          />
+          <StatusPill tone="neutral" label={`Contract ${shortenAddress(arcanumMessengerAddress)}`} />
+          {isConnected && address ? <StatusPill tone="neutral" icon={<Wallet size={13} aria-hidden="true" />} label={shortenAddress(address)} /> : null}
 
-            <div className="space-y-2">
-              <label htmlFor="message" className="text-sm font-medium text-zinc-200">
-                Mesaj
-              </label>
-              <textarea
-                id="message"
-                value={message}
-                onChange={(event) => setMessage(event.target.value)}
-                disabled={!isConnected}
-                maxLength={280}
-                rows={5}
-                placeholder="Mesajını yaz..."
-                className="w-full resize-none rounded-md border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-zinc-600 focus:border-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
-              />
-              <p className="text-right text-xs text-zinc-500">{message.length}/280</p>
-            </div>
-
-            <div className="space-y-3">
-              <p className="text-sm font-medium text-zinc-200">Gizlilik</p>
-              <div className="grid grid-cols-2 gap-2 rounded-lg border border-zinc-800 bg-zinc-950 p-1">
-                <button
-                  type="button"
-                  disabled={!isConnected}
-                  onClick={() => setPrivacy('private')}
-                  className={`inline-flex h-11 items-center justify-center gap-2 rounded-md text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${privacy === 'private' ? 'bg-emerald-400 text-zinc-950' : 'text-zinc-300 hover:bg-zinc-800'}`}
-                >
-                  <Lock size={16} aria-hidden="true" />
-                  Gizli
-                </button>
-                <button
-                  type="button"
-                  disabled={!isConnected}
-                  onClick={() => setPrivacy('public')}
-                  className={`inline-flex h-11 items-center justify-center gap-2 rounded-md text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${privacy === 'public' ? 'bg-sky-300 text-zinc-950' : 'text-zinc-300 hover:bg-zinc-800'}`}
-                >
-                  <Shield size={16} aria-hidden="true" />
-                  Açık
-                </button>
-              </div>
-              {privacy === 'private' && recipientIsValid && !recipientEncryptionKey ? (
-                <p className="text-sm text-amber-300">Alıcı önce Arcanum’a şifreleme anahtarı kaydetmeli.</p>
-              ) : null}
-            </div>
-
-            <button
-              type="submit"
-              disabled={!canSend || (privacy === 'private' && !recipientEncryptionKey)}
-              className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-md bg-emerald-400 px-5 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
-            >
-              <Send size={18} aria-hidden="true" />
-              {isWritePending ? 'Cüzdan bekleniyor...' : 'Zincire gönder'}
+          {isConnected && !isCorrectChain ? (
+            <button type="button" onClick={onSwitchChain} disabled={isSwitchPending} className="btn-primary h-10 px-4">
+              {isSwitchPending ? 'Switching...' : 'Arc Network’e geç'}
             </button>
-          </form>
-
-          {status || flowError || connectError || switchError || writeError ? (
-            <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4 text-sm">
-              {status ? <p className="text-emerald-200">{status}</p> : null}
-              {latestTxUrl ? (
-                <a
-                  href={latestTxUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-2 inline-flex items-center gap-1 text-emerald-300 hover:text-emerald-200"
-                >
-                  Explorer’da görüntüle
-                  <ExternalLink size={14} aria-hidden="true" />
-                </a>
-              ) : null}
-              {[flowError, connectError?.message, switchError?.message, writeError?.message]
-                .filter(Boolean)
-                .map((messageText) => (
-                  <p key={messageText} className="mt-2 break-words text-red-300">
-                    {messageText}
-                  </p>
-                ))}
-            </div>
           ) : null}
-        </div>
 
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/70 p-4">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div className="grid grid-cols-2 rounded-lg border border-zinc-800 bg-zinc-950 p-1">
-              <button
-                type="button"
-                onClick={() => setTab('inbox')}
-                className={`inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium transition ${tab === 'inbox' ? 'bg-white text-zinc-950' : 'text-zinc-400 hover:bg-zinc-800'}`}
-              >
-                <Inbox size={16} aria-hidden="true" />
-                Inbox
-              </button>
-              <button
-                type="button"
-                onClick={() => setTab('sent')}
-                className={`inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium transition ${tab === 'sent' ? 'bg-white text-zinc-950' : 'text-zinc-400 hover:bg-zinc-800'}`}
-              >
-                <Send size={16} aria-hidden="true" />
-                Sent
-              </button>
-            </div>
-            <button
-              type="button"
-              disabled={!isConnected || isFetchingMessages}
-              onClick={() => (tab === 'inbox' ? refetchInbox() : refetchSent())}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-zinc-700 text-zinc-300 transition hover:border-zinc-500 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
-              aria-label="Mesajları yenile"
-            >
-              <RefreshCw size={16} className={isFetchingMessages ? 'animate-spin' : ''} aria-hidden="true" />
+          {isConnected ? (
+            <button type="button" onClick={onDisconnect} className="btn-ghost h-10 px-3" aria-label="Bağlantıyı kes">
+              <X size={16} aria-hidden="true" />
             </button>
-          </div>
-
-          <div className="space-y-3">
-            {!isConnected ? <p className="text-sm text-zinc-500">Mesajları görmek için cüzdan bağla.</p> : null}
-            {isConnected && visibleMessages?.length === 0 ? <p className="text-sm text-zinc-500">Henüz mesaj yok.</p> : null}
-            {visibleMessages?.map((chainMessage) => (
-              <MessageCard key={`${tab}-${chainMessage.id.toString()}`} message={chainMessage} viewer={address} mode={tab} />
-            ))}
-          </div>
+          ) : (
+            <button type="button" disabled={!connectorReady || isConnectPending} onClick={onConnect} className="btn-primary h-10 px-4">
+              <Wallet size={16} aria-hidden="true" />
+              {isConnectPending ? 'Bağlanıyor...' : 'Cüzdanı Bağla'}
+            </button>
+          )}
         </div>
+      </div>
+    </header>
+  );
+}
+
+function ComposePanel({
+  recipient,
+  message,
+  privacy,
+  isConnected,
+  isCorrectChain,
+  isWritePending,
+  canSend,
+  recipientIsValid,
+  privateRecipientMissing,
+  ownEncryptionKey,
+  onRecipientChange,
+  onMessageChange,
+  onPrivacyChange,
+  onRegisterKey,
+  onSubmit,
+}: {
+  recipient: string;
+  message: string;
+  privacy: PrivacyMode;
+  isConnected: boolean;
+  isCorrectChain: boolean;
+  isWritePending: boolean;
+  canSend: boolean;
+  recipientIsValid: boolean;
+  privateRecipientMissing: boolean;
+  ownEncryptionKey: string;
+  onRecipientChange: (value: string) => void;
+  onMessageChange: (value: string) => void;
+  onPrivacyChange: (value: PrivacyMode) => void;
+  onRegisterKey: () => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  const hasKey = ownEncryptionKey.length > 0;
+
+  return (
+    <section className="panel">
+      <div className="panel-header">
+        <div>
+          <p className="eyebrow">Compose</p>
+          <h2 className="panel-title">Yeni mesaj</h2>
+        </div>
+        <EncryptionKeyStatus hasKey={hasKey} canRegister={isConnected && isCorrectChain && !isWritePending} onRegister={onRegisterKey} />
+      </div>
+
+      {!isConnected ? <EmptyState tone="neutral" title="Cüzdan bağlı değil" body="Mesaj oluşturmak için önce cüzdanını bağla." /> : null}
+      {isConnected && !isCorrectChain ? <EmptyState tone="warning" title="Yanlış ağ" body="Gönderim için Arc Testnet ağına geç." /> : null}
+
+      <form onSubmit={onSubmit} className="mt-4 space-y-4">
+        <FieldLabel htmlFor="recipient" label="Alıcı adresi" />
+        <input
+          id="recipient"
+          value={recipient}
+          onChange={(event) => onRecipientChange(event.target.value)}
+          disabled={!isConnected}
+          placeholder="0x..."
+          className="input font-mono"
+        />
+        {recipient && !recipientIsValid ? <p className="helper-warning">Geçerli bir EVM adresi gir.</p> : null}
+
+        <FieldLabel htmlFor="message" label="Mesaj" />
+        <textarea
+          id="message"
+          value={message}
+          onChange={(event) => onMessageChange(event.target.value)}
+          disabled={!isConnected}
+          maxLength={280}
+          rows={6}
+          placeholder="Mesajını yaz..."
+          className="input min-h-36 resize-none py-3 leading-6"
+        />
+        <p className="text-right text-xs text-zinc-500">{message.length}/280</p>
+
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-zinc-200">Gizlilik</p>
+          <div className="grid grid-cols-2 gap-2 rounded-lg border border-zinc-800 bg-zinc-950 p-1">
+            <ModeButton active={privacy === 'private'} disabled={!isConnected} icon={<Lock size={16} aria-hidden="true" />} label="Private" onClick={() => onPrivacyChange('private')} />
+            <ModeButton active={privacy === 'public'} disabled={!isConnected} icon={<Shield size={16} aria-hidden="true" />} label="Public" onClick={() => onPrivacyChange('public')} />
+          </div>
+          {privateRecipientMissing ? <p className="helper-warning">Alıcı önce Arcanum’a şifreleme anahtarı kaydetmeli.</p> : null}
+        </div>
+
+        <button type="submit" disabled={!canSend || privateRecipientMissing} className="btn-primary h-12 w-full">
+          <Send size={18} aria-hidden="true" />
+          {isWritePending ? 'Wallet confirmation...' : 'Zincire gönder'}
+        </button>
+      </form>
+    </section>
+  );
+}
+
+function EncryptionKeyStatus({ hasKey, canRegister, onRegister }: { hasKey: boolean; canRegister: boolean; onRegister: () => void }) {
+  return (
+    <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center">
+      <StatusPill
+        tone={hasKey ? 'success' : 'warning'}
+        icon={<KeyRound size={13} aria-hidden="true" />}
+        label={hasKey ? 'Key registered' : 'Key required'}
+      />
+      {!hasKey ? (
+        <button type="button" disabled={!canRegister} onClick={onRegister} className="btn-ghost h-9 px-3 text-xs">
+          Register key
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function MessagesPanel({
+  tab,
+  messages,
+  viewer,
+  isConnected,
+  isFetching,
+  onTabChange,
+  onRefresh,
+}: {
+  tab: TabMode;
+  messages?: ChainMessage[];
+  viewer?: `0x${string}`;
+  isConnected: boolean;
+  isFetching: boolean;
+  onTabChange: (tab: TabMode) => void;
+  onRefresh: () => void;
+}) {
+  return (
+    <section className="panel min-h-[520px]">
+      <div className="panel-header">
+        <div>
+          <p className="eyebrow">Messages</p>
+          <h2 className="panel-title">Inbox / Sent</h2>
+        </div>
+        <button type="button" disabled={!isConnected || isFetching} onClick={onRefresh} className="btn-ghost h-10 w-10" aria-label="Mesajları yenile">
+          <RefreshCw size={16} className={isFetching ? 'animate-spin' : ''} aria-hidden="true" />
+        </button>
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 rounded-lg border border-zinc-800 bg-zinc-950 p-1">
+        <TabButton active={tab === 'inbox'} icon={<Inbox size={16} aria-hidden="true" />} label="Inbox" onClick={() => onTabChange('inbox')} />
+        <TabButton active={tab === 'sent'} icon={<Send size={16} aria-hidden="true" />} label="Sent" onClick={() => onTabChange('sent')} />
+      </div>
+
+      <div className="mt-4 space-y-3">
+        {!isConnected ? <EmptyState tone="neutral" title="Cüzdan bağlı değil" body="Inbox ve Sent mesajlarını görmek için cüzdanını bağla." /> : null}
+        {isConnected && messages?.length === 0 ? <EmptyState tone="neutral" title="Mesaj yok" body={`${tab === 'inbox' ? 'Inbox' : 'Sent'} akışı şu an boş.`} /> : null}
+        {messages?.map((chainMessage) => (
+          <MessageCard key={`${tab}-${chainMessage.id.toString()}`} message={chainMessage} viewer={viewer} mode={tab} />
+        ))}
       </div>
     </section>
   );
 }
 
-function MessageCard({
-  message,
-  viewer,
-  mode,
-}: {
-  message: ChainMessage;
-  viewer?: `0x${string}`;
-  mode: TabMode;
-}) {
+function TransactionNotice({ status, tone, errors, txUrl }: { status: string; tone: NoticeTone; errors: string[]; txUrl?: string }) {
+  if (!status && errors.length === 0 && !txUrl) {
+    return null;
+  }
+
+  const isError = tone === 'error' || errors.length > 0;
+  const isSuccess = tone === 'success';
+
+  return (
+    <div className={`mt-4 rounded-lg border px-4 py-3 text-sm ${isError ? 'border-red-400/30 bg-red-400/10 text-red-200' : isSuccess ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-100' : 'border-amber-300/30 bg-amber-300/10 text-amber-100'}`}>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-2">
+          {isError ? <AlertTriangle size={16} aria-hidden="true" /> : isSuccess ? <CheckCircle2 size={16} aria-hidden="true" /> : <Clock3 size={16} aria-hidden="true" />}
+          <p className="min-w-0 break-words">{errors[0] ?? status}</p>
+        </div>
+        {txUrl ? (
+          <a href={txUrl} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 text-current underline-offset-4 hover:underline">
+            Explorer
+            <ExternalLink size={14} aria-hidden="true" />
+          </a>
+        ) : null}
+      </div>
+      {errors.slice(1).map((error) => (
+        <p key={error} className="mt-2 break-words text-red-200/90">
+          {error}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+function MessageCard({ message, viewer, mode }: { message: ChainMessage; viewer?: `0x${string}`; mode: TabMode }) {
   const [decrypted, setDecrypted] = useState<string | null>(null);
   const [decryptError, setDecryptError] = useState('');
 
@@ -467,30 +566,85 @@ function MessageCard({
   const body = message.isPrivate ? decrypted ?? 'Şifreli payload zincirde saklanıyor.' : message.payload;
 
   return (
-    <article className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs ${message.isPrivate ? 'bg-emerald-400/10 text-emerald-200' : 'bg-sky-300/10 text-sky-200'}`}>
-          {message.isPrivate ? <Lock size={13} aria-hidden="true" /> : <Shield size={13} aria-hidden="true" />}
-          {message.isPrivate ? 'Gizli' : 'Açık'}
-        </span>
-        <span className="text-xs text-zinc-500">#{message.id.toString()}</span>
+    <article className="rounded-lg border border-zinc-800 bg-zinc-950 p-4 shadow-lg shadow-black/10">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <StatusPill
+          tone={message.isPrivate ? 'success' : 'info'}
+          icon={message.isPrivate ? <Lock size={13} aria-hidden="true" /> : <Shield size={13} aria-hidden="true" />}
+          label={message.isPrivate ? 'Private' : 'Public'}
+        />
+        <span className="font-mono text-xs text-zinc-500">#{message.id.toString()}</span>
       </div>
       <p className="whitespace-pre-wrap break-words text-sm leading-6 text-zinc-100">{body}</p>
-      {decryptError ? <p className="mt-2 text-sm text-amber-300">{decryptError}</p> : null}
-      <dl className="mt-4 space-y-1 text-xs text-zinc-500">
-        <div>
-          <dt className="inline">Gönderen: </dt>
-          <dd className="inline font-mono">{shortenAddress(message.sender)}</dd>
+      {decryptError ? <p className="mt-3 rounded-md border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-sm text-amber-200">{decryptError}</p> : null}
+      <div className="mt-4 grid gap-2 text-xs text-zinc-500 sm:grid-cols-2">
+        <AddressMeta label="From" value={message.sender} />
+        <AddressMeta label="To" value={message.recipient} />
+        <div className="sm:col-span-2">
+          <span className="text-zinc-600">Time </span>
+          <span>{formatTimestamp(message.timestamp)}</span>
         </div>
-        <div>
-          <dt className="inline">Alıcı: </dt>
-          <dd className="inline font-mono">{shortenAddress(message.recipient)}</dd>
-        </div>
-        <div>
-          <dt className="inline">Zaman: </dt>
-          <dd className="inline">{formatTimestamp(message.timestamp)}</dd>
-        </div>
-      </dl>
+      </div>
     </article>
+  );
+}
+
+function AddressMeta({ label, value }: { label: string; value: `0x${string}` }) {
+  return (
+    <div className="min-w-0">
+      <span className="text-zinc-600">{label} </span>
+      <span className="font-mono text-zinc-400">{shortenAddress(value)}</span>
+    </div>
+  );
+}
+
+function EmptyState({ tone, title, body }: { tone: 'neutral' | 'warning'; title: string; body: string }) {
+  return (
+    <div className={`rounded-lg border px-4 py-3 ${tone === 'warning' ? 'border-amber-300/25 bg-amber-300/10' : 'border-zinc-800 bg-zinc-950'}`}>
+      <p className="text-sm font-medium text-zinc-200">{title}</p>
+      <p className="mt-1 text-sm text-zinc-500">{body}</p>
+    </div>
+  );
+}
+
+function FieldLabel({ htmlFor, label }: { htmlFor: string; label: string }) {
+  return (
+    <label htmlFor={htmlFor} className="block text-sm font-medium text-zinc-200">
+      {label}
+    </label>
+  );
+}
+
+function ModeButton({ active, disabled, icon, label, onClick }: { active: boolean; disabled: boolean; icon: React.ReactNode; label: string; onClick: () => void }) {
+  return (
+    <button type="button" disabled={disabled} onClick={onClick} className={`inline-flex h-11 items-center justify-center gap-2 rounded-md text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${active ? 'bg-white text-zinc-950' : 'text-zinc-300 hover:bg-zinc-800'}`}>
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+function TabButton({ active, icon, label, onClick }: { active: boolean; icon: React.ReactNode; label: string; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className={`inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium transition ${active ? 'bg-white text-zinc-950' : 'text-zinc-400 hover:bg-zinc-800'}`}>
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+function StatusPill({ tone, icon, label }: { tone: 'neutral' | 'success' | 'warning' | 'info'; icon?: React.ReactNode; label: string }) {
+  const toneClass = {
+    neutral: 'border-zinc-700 bg-zinc-900 text-zinc-300',
+    success: 'border-emerald-400/25 bg-emerald-400/10 text-emerald-200',
+    warning: 'border-amber-300/25 bg-amber-300/10 text-amber-200',
+    info: 'border-sky-300/25 bg-sky-300/10 text-sky-200',
+  }[tone];
+
+  return (
+    <span className={`inline-flex min-w-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${toneClass}`}>
+      {icon}
+      <span className="truncate">{label}</span>
+    </span>
   );
 }
