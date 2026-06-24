@@ -138,7 +138,8 @@ async function importPublicKey(publicKey: string) {
 }
 
 async function importPrivateKey(jwk: JsonWebKey) {
-  return crypto.subtle.importKey('jwk', jwk, { name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+  const normalizedJwk: JsonWebKey = { ...jwk, key_ops: ['deriveBits'] };
+  return crypto.subtle.importKey('jwk', normalizedJwk, { name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
 }
 
 async function deriveLegacyAesKey(privateKey: CryptoKey, publicKey: CryptoKey) {
