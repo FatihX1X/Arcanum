@@ -36,7 +36,7 @@ function shortenAddress(address: string) {
 }
 
 function formatTimestamp(timestamp: bigint) {
-  if (timestamp === 0n) {
+  if (timestamp === BigInt(0)) {
     return '-';
   }
 
