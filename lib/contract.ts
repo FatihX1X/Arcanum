@@ -1,7 +1,7 @@
 import { parseEther } from 'viem';
 
 export const arcanumMessengerAddress = (
-  process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '0xE238054755B41cA6bDe7C848F9b3e92BCEE22b4A'
+  process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '0x5b713DB5623d640a2E6c6eA0f002F229191E5DBB'
 ) as `0x${string}`;
 
 export const isArcanumMessengerConfigured =
@@ -31,10 +31,31 @@ export const arcanumMessengerAbi = [
   },
   {
     type: 'function',
-    name: 'treasury',
+    name: 'MAX_PAYLOAD_BYTES',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'MAX_PAGE_SIZE',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'FEE_CLAIM_WALLET',
     stateMutability: 'view',
     inputs: [],
     outputs: [{ name: '', type: 'address' }],
+  },
+  {
+    type: 'function',
+    name: 'feeClaimWhitelist',
+    stateMutability: 'view',
+    inputs: [{ name: '', type: 'address' }],
+    outputs: [{ name: '', type: 'bool' }],
   },
   {
     type: 'function',
@@ -103,7 +124,69 @@ export const arcanumMessengerAbi = [
   },
   {
     type: 'function',
-    name: 'withdrawFees',
+    name: 'getInboxPage',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'account', type: 'address' },
+      { name: 'offset', type: 'uint256' },
+      { name: 'limit', type: 'uint256' },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'tuple[]',
+        components: [
+          { name: 'id', type: 'uint256' },
+          { name: 'sender', type: 'address' },
+          { name: 'recipient', type: 'address' },
+          { name: 'payload', type: 'string' },
+          { name: 'isPrivate', type: 'bool' },
+          { name: 'timestamp', type: 'uint256' },
+        ],
+      },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'getOutboxPage',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'account', type: 'address' },
+      { name: 'offset', type: 'uint256' },
+      { name: 'limit', type: 'uint256' },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'tuple[]',
+        components: [
+          { name: 'id', type: 'uint256' },
+          { name: 'sender', type: 'address' },
+          { name: 'recipient', type: 'address' },
+          { name: 'payload', type: 'string' },
+          { name: 'isPrivate', type: 'bool' },
+          { name: 'timestamp', type: 'uint256' },
+        ],
+      },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'getInboxCount',
+    stateMutability: 'view',
+    inputs: [{ name: 'account', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'getOutboxCount',
+    stateMutability: 'view',
+    inputs: [{ name: 'account', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'claim_fees',
     stateMutability: 'nonpayable',
     inputs: [],
     outputs: [],
