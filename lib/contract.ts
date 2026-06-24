@@ -1,11 +1,41 @@
+import { parseEther } from 'viem';
+
 export const arcanumMessengerAddress = (
-  process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '0xC5E634BBA75bB25758E15247E7C07Da889301584'
+  process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '0xE238054755B41cA6bDe7C848F9b3e92BCEE22b4A'
 ) as `0x${string}`;
 
 export const isArcanumMessengerConfigured =
   arcanumMessengerAddress !== '0x0000000000000000000000000000000000000000';
 
+export const publicMessageFee = parseEther('0.01');
+export const privateMessageFee = parseEther('0.05');
+export const messageFeeLabel = {
+  public: '0.01 USDC',
+  private: '0.05 USDC',
+} as const;
+
 export const arcanumMessengerAbi = [
+  {
+    type: 'function',
+    name: 'PRIVATE_MESSAGE_FEE',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'PUBLIC_MESSAGE_FEE',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'treasury',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+  },
   {
     type: 'function',
     name: 'registerEncryptionKey',
@@ -16,7 +46,7 @@ export const arcanumMessengerAbi = [
   {
     type: 'function',
     name: 'sendMessage',
-    stateMutability: 'nonpayable',
+    stateMutability: 'payable',
     inputs: [
       { name: 'recipient', type: 'address' },
       { name: 'payload', type: 'string' },
@@ -70,6 +100,13 @@ export const arcanumMessengerAbi = [
     stateMutability: 'view',
     inputs: [{ name: '', type: 'address' }],
     outputs: [{ name: '', type: 'string' }],
+  },
+  {
+    type: 'function',
+    name: 'withdrawFees',
+    stateMutability: 'nonpayable',
+    inputs: [],
+    outputs: [],
   },
 ] as const;
 
