@@ -1,3 +1,26 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: #09090b;
+}
+
+body {
+  min-height: 100%;
+  margin: 0;
+  background: #09090b;
+}
+
+::selection {
+  background: rgba(52, 211, 153, 0.35);
+}
