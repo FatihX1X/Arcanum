@@ -7,13 +7,29 @@ type StoredKeyPair = {
   privateKey: JsonWebKey;
 };
 
-type EncryptedPayload = {
+type EncryptedCopy = {
+  iv: string;
+  data: string;
+};
+
+type EncryptedPayloadV1 = {
   version: 1;
   alg: 'ECDH-P256-AES-GCM';
   iv: string;
   data: string;
   senderPublicKey: string;
 };
+
+type EncryptedPayloadV2 = {
+  version: 2;
+  alg: 'ECDH-P256-AES-GCM';
+  senderPublicKey: string;
+  recipientPublicKey: string;
+  recipient: EncryptedCopy;
+  sender: EncryptedCopy;
+};
+
+type EncryptedPayload = EncryptedPayloadV1 | EncryptedPayloadV2;
 
 function storageKey(address: string) {
   return `${storagePrefix}${address.toLowerCase()}`;
@@ -61,6 +77,26 @@ async function deriveAesKey(privateKey: CryptoKey, publicKey: CryptoKey) {
   );
 }
 
+async function encryptCopy(message: string, aesKey: CryptoKey): Promise<EncryptedCopy> {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, textEncoder.encode(message));
+
+  return {
+    iv: encodeBase64Url(iv),
+    data: encodeBase64Url(encrypted),
+  };
+}
+
+async function decryptCopy(copy: EncryptedCopy, aesKey: CryptoKey) {
+  const decrypted = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: decodeBase64Url(copy.iv) },
+    aesKey,
+    decodeBase64Url(copy.data),
+  );
+
+  return textDecoder.decode(decrypted);
+}
+
 export async function ensureEncryptionKeyPair(address: string) {
   const existing = localStorage.getItem(storageKey(address));
 
@@ -94,31 +130,45 @@ export async function encryptMessage(message: string, recipientPublicKey: string
   const senderKeys = await ensureEncryptionKeyPair(senderAddress);
   const senderPrivateKey = await importPrivateKey(senderKeys.privateKey);
   const recipientKey = await importPublicKey(recipientPublicKey);
-  const aesKey = await deriveAesKey(senderPrivateKey, recipientKey);
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, textEncoder.encode(message));
-  const payload: EncryptedPayload = {
-    version: 1,
+  const senderKey = await importPublicKey(senderKeys.publicKey);
+  const recipientAesKey = await deriveAesKey(senderPrivateKey, recipientKey);
+  const senderAesKey = await deriveAesKey(senderPrivateKey, senderKey);
+
+  const payload: EncryptedPayloadV2 = {
+    version: 2,
     alg: 'ECDH-P256-AES-GCM',
-    iv: encodeBase64Url(iv),
-    data: encodeBase64Url(encrypted),
     senderPublicKey: senderKeys.publicKey,
+    recipientPublicKey,
+    recipient: await encryptCopy(message, recipientAesKey),
+    sender: await encryptCopy(message, senderAesKey),
   };
 
   return JSON.stringify(payload);
 }
 
-export async function decryptMessage(payload: string, recipientAddress: string) {
-  const recipientKeys = await ensureEncryptionKeyPair(recipientAddress);
+export async function decryptMessage(payload: string, viewerAddress: string) {
+  const viewerKeys = await ensureEncryptionKeyPair(viewerAddress);
   const parsed = JSON.parse(payload) as EncryptedPayload;
-  const recipientPrivateKey = await importPrivateKey(recipientKeys.privateKey);
-  const senderPublicKey = await importPublicKey(parsed.senderPublicKey);
-  const aesKey = await deriveAesKey(recipientPrivateKey, senderPublicKey);
-  const decrypted = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: decodeBase64Url(parsed.iv) },
-    aesKey,
-    decodeBase64Url(parsed.data),
-  );
+  const viewerPrivateKey = await importPrivateKey(viewerKeys.privateKey);
 
-  return textDecoder.decode(decrypted);
+  if (parsed.version === 1) {
+    const senderPublicKey = await importPublicKey(parsed.senderPublicKey);
+    const aesKey = await deriveAesKey(viewerPrivateKey, senderPublicKey);
+    return decryptCopy({ iv: parsed.iv, data: parsed.data }, aesKey);
+  }
+
+  if (parsed.version !== 2) {
+    throw new Error('Unsupported private payload version.');
+  }
+
+  const senderPublicKey = await importPublicKey(parsed.senderPublicKey);
+  const aesKey = await deriveAesKey(viewerPrivateKey, senderPublicKey);
+  const preferredCopy = viewerKeys.publicKey === parsed.senderPublicKey ? parsed.sender : parsed.recipient;
+
+  try {
+    return await decryptCopy(preferredCopy, aesKey);
+  } catch (error) {
+    const fallbackCopy = preferredCopy === parsed.sender ? parsed.recipient : parsed.sender;
+    return decryptCopy(fallbackCopy, aesKey);
+  }
 }
