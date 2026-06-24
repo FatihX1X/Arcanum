@@ -1,10 +1,29 @@
 const storagePrefix = 'arcanum.encryptionKey.';
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
+const localKdfIterations = 250000;
+const backupKdfIterations = 250000;
+const sessionKeys = new Map<string, StoredKeyPair>();
 
 type StoredKeyPair = {
   publicKey: JsonWebKey;
   privateKey: JsonWebKey;
+};
+
+type EncryptedLocalKey = {
+  version: 2;
+  app: 'arcanum';
+  type: 'local-key';
+  alg: 'PBKDF2-SHA256-AES-GCM';
+  address: string;
+  publicKey: string;
+  createdAt: string;
+  kdf: {
+    iterations: number;
+    salt: string;
+  };
+  iv: string;
+  data: string;
 };
 
 type EncryptedCopy = {
@@ -29,7 +48,24 @@ type EncryptedPayloadV2 = {
   sender: EncryptedCopy;
 };
 
-type EncryptedPayload = EncryptedPayloadV1 | EncryptedPayloadV2;
+type EncryptedPayloadV3 = {
+  version: 3;
+  alg: 'ECDH-P256-HKDF-SHA256-AES-GCM';
+  meta: {
+    chainId: number;
+    contractAddress: string;
+    sender: string;
+    recipient: string;
+    senderPublicKey: string;
+    recipientPublicKey: string;
+    senderKeyId: string;
+    recipientKeyId: string;
+  };
+  recipient: EncryptedCopy;
+  sender: EncryptedCopy;
+};
+
+type EncryptedPayload = EncryptedPayloadV1 | EncryptedPayloadV2 | EncryptedPayloadV3;
 
 type EncryptedKeyBackup = {
   version: 1;
@@ -46,10 +82,19 @@ type EncryptedKeyBackup = {
   data: string;
 };
 
-const backupKdfIterations = 250000;
+export type MessageCryptoContext = {
+  chainId: number;
+  contractAddress: string;
+  senderAddress: string;
+  recipientAddress: string;
+};
 
 function storageKey(address: string) {
   return `${storagePrefix}${address.toLowerCase()}`;
+}
+
+function normalizeAddress(address: string) {
+  return address.toLowerCase();
 }
 
 function encodeBase64Url(value: ArrayBuffer | Uint8Array | string) {
@@ -79,34 +124,39 @@ function toArrayBuffer(bytes: Uint8Array) {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
 
+function publicKeyString(jwk: JsonWebKey) {
+  return encodeBase64Url(JSON.stringify(jwk));
+}
+
+async function sha256Base64Url(value: string) {
+  return encodeBase64Url(await crypto.subtle.digest('SHA-256', textEncoder.encode(value)));
+}
+
 async function importPublicKey(publicKey: string) {
   const jwk = JSON.parse(textDecoder.decode(decodeBase64Url(publicKey))) as JsonWebKey;
   return crypto.subtle.importKey('jwk', jwk, { name: 'ECDH', namedCurve: 'P-256' }, true, []);
 }
 
 async function importPrivateKey(jwk: JsonWebKey) {
-  return crypto.subtle.importKey('jwk', jwk, { name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveKey']);
+  return crypto.subtle.importKey('jwk', jwk, { name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
 }
 
-async function deriveAesKey(privateKey: CryptoKey, publicKey: CryptoKey) {
-  return crypto.subtle.deriveKey(
-    { name: 'ECDH', public: publicKey },
-    privateKey,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt', 'decrypt'],
-  );
+async function deriveLegacyAesKey(privateKey: CryptoKey, publicKey: CryptoKey) {
+  const bits = await crypto.subtle.deriveBits({ name: 'ECDH', public: publicKey }, privateKey, 256);
+  return crypto.subtle.importKey('raw', bits, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
 }
 
-async function deriveBackupKey(passphrase: string, salt: Uint8Array) {
-  const keyMaterial = await crypto.subtle.importKey('raw', textEncoder.encode(passphrase), 'PBKDF2', false, ['deriveKey']);
+async function deriveV3AesKey(privateKey: CryptoKey, publicKey: CryptoKey, aad: string) {
+  const bits = await crypto.subtle.deriveBits({ name: 'ECDH', public: publicKey }, privateKey, 256);
+  const keyMaterial = await crypto.subtle.importKey('raw', bits, 'HKDF', false, ['deriveKey']);
+  const salt = await crypto.subtle.digest('SHA-256', textEncoder.encode(`arcanum:v3:salt:${aad}`));
 
   return crypto.subtle.deriveKey(
     {
-      name: 'PBKDF2',
+      name: 'HKDF',
       hash: 'SHA-256',
-      salt: toArrayBuffer(salt),
-      iterations: backupKdfIterations,
+      salt,
+      info: textEncoder.encode(`arcanum:v3:message:${aad}`),
     },
     keyMaterial,
     { name: 'AES-GCM', length: 256 },
@@ -115,9 +165,30 @@ async function deriveBackupKey(passphrase: string, salt: Uint8Array) {
   );
 }
 
-async function encryptCopy(message: string, aesKey: CryptoKey): Promise<EncryptedCopy> {
+async function derivePasswordKey(passphrase: string, salt: Uint8Array, iterations: number) {
+  const keyMaterial = await crypto.subtle.importKey('raw', textEncoder.encode(passphrase), 'PBKDF2', false, ['deriveKey']);
+
+  return crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      hash: 'SHA-256',
+      salt: toArrayBuffer(salt),
+      iterations,
+    },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt'],
+  );
+}
+
+async function encryptCopy(message: string, aesKey: CryptoKey, aad?: string): Promise<EncryptedCopy> {
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, textEncoder.encode(message));
+  const encrypted = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv, additionalData: aad ? textEncoder.encode(aad) : undefined },
+    aesKey,
+    textEncoder.encode(message),
+  );
 
   return {
     iv: encodeBase64Url(iv),
@@ -125,9 +196,9 @@ async function encryptCopy(message: string, aesKey: CryptoKey): Promise<Encrypte
   };
 }
 
-async function decryptCopy(copy: EncryptedCopy, aesKey: CryptoKey) {
+async function decryptCopy(copy: EncryptedCopy, aesKey: CryptoKey, aad?: string) {
   const decrypted = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: decodeBase64Url(copy.iv) },
+    { name: 'AES-GCM', iv: decodeBase64Url(copy.iv), additionalData: aad ? textEncoder.encode(aad) : undefined },
     aesKey,
     decodeBase64Url(copy.data),
   );
@@ -135,43 +206,97 @@ async function decryptCopy(copy: EncryptedCopy, aesKey: CryptoKey) {
   return textDecoder.decode(decrypted);
 }
 
-export async function ensureEncryptionKeyPair(address: string) {
-  const existing = localStorage.getItem(storageKey(address));
+function isEncryptedLocalKey(value: unknown): value is EncryptedLocalKey {
+  return (
+    Boolean(value) &&
+    typeof value === 'object' &&
+    (value as EncryptedLocalKey).version === 2 &&
+    (value as EncryptedLocalKey).app === 'arcanum' &&
+    (value as EncryptedLocalKey).type === 'local-key'
+  );
+}
 
-  if (existing) {
-    const parsed = JSON.parse(existing) as StoredKeyPair;
-    return {
-      publicKey: encodeBase64Url(JSON.stringify(parsed.publicKey)),
-      privateKey: parsed.privateKey,
-    };
+async function encryptStoredKeyPair(address: string, stored: StoredKeyPair, passphrase: string) {
+  const publicKey = publicKeyString(stored.publicKey);
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const localKey = await derivePasswordKey(passphrase, salt, localKdfIterations);
+  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, localKey, textEncoder.encode(JSON.stringify(stored)));
+
+  const encryptedLocalKey: EncryptedLocalKey = {
+    version: 2,
+    app: 'arcanum',
+    type: 'local-key',
+    alg: 'PBKDF2-SHA256-AES-GCM',
+    address: normalizeAddress(address),
+    publicKey,
+    createdAt: new Date().toISOString(),
+    kdf: {
+      iterations: localKdfIterations,
+      salt: encodeBase64Url(salt),
+    },
+    iv: encodeBase64Url(iv),
+    data: encodeBase64Url(encrypted),
+  };
+
+  localStorage.setItem(storageKey(address), JSON.stringify(encryptedLocalKey));
+  sessionKeys.set(storageKey(address), stored);
+
+  return publicKey;
+}
+
+async function decryptStoredKeyPair(record: EncryptedLocalKey, passphrase: string) {
+  const salt = decodeBase64Url(record.kdf.salt);
+  const localKey = await derivePasswordKey(passphrase, salt, record.kdf.iterations);
+  const decrypted = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: decodeBase64Url(record.iv) },
+    localKey,
+    decodeBase64Url(record.data),
+  );
+  const stored = JSON.parse(textDecoder.decode(decrypted)) as StoredKeyPair;
+  const publicKey = publicKeyString(stored.publicKey);
+
+  if (publicKey !== record.publicKey) {
+    throw new Error('LOCAL_KEY_PUBLIC_MISMATCH');
   }
 
-  const keyPair = await crypto.subtle.generateKey(
-    { name: 'ECDH', namedCurve: 'P-256' },
-    true,
-    ['deriveKey'],
-  );
-
-  const publicKey = await crypto.subtle.exportKey('jwk', keyPair.publicKey);
-  const privateKey = await crypto.subtle.exportKey('jwk', keyPair.privateKey);
-  const stored: StoredKeyPair = { publicKey, privateKey };
-
-  localStorage.setItem(storageKey(address), JSON.stringify(stored));
-
-  return {
-    publicKey: encodeBase64Url(JSON.stringify(publicKey)),
-    privateKey,
-  };
+  return stored;
 }
 
-export function hasStoredEncryptionKey(address: string) {
-  return Boolean(localStorage.getItem(storageKey(address)));
-}
+async function readKeyPair(address: string, passphrase?: string, createIfMissing = false) {
+  const key = storageKey(address);
+  const cached = sessionKeys.get(key);
 
-export async function exportEncryptionKey(address: string, passphrase: string) {
-  const existing = localStorage.getItem(storageKey(address));
+  if (cached) {
+    return cached;
+  }
 
-  if (!existing) {
+  const existing = localStorage.getItem(key);
+
+  if (existing) {
+    const parsed = JSON.parse(existing) as EncryptedLocalKey | StoredKeyPair;
+
+    if (isEncryptedLocalKey(parsed)) {
+      if (!passphrase) {
+        throw new Error('LOCAL_KEY_LOCKED');
+      }
+      if (parsed.address !== normalizeAddress(address)) {
+        throw new Error('LOCAL_KEY_ADDRESS_MISMATCH');
+      }
+      const stored = await decryptStoredKeyPair(parsed, passphrase);
+      sessionKeys.set(key, stored);
+      return stored;
+    }
+
+    if (!passphrase) {
+      throw new Error('LOCAL_KEY_REQUIRES_MIGRATION');
+    }
+
+    await encryptStoredKeyPair(address, parsed, passphrase);
+    return parsed;
+  }
+
+  if (!createIfMissing) {
     throw new Error('NO_LOCAL_KEY');
   }
 
@@ -179,17 +304,71 @@ export async function exportEncryptionKey(address: string, passphrase: string) {
     throw new Error('PASSPHRASE_REQUIRED');
   }
 
-  const parsed = JSON.parse(existing) as StoredKeyPair;
-  const publicKey = encodeBase64Url(JSON.stringify(parsed.publicKey));
+  const keyPair = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+  const publicKey = await crypto.subtle.exportKey('jwk', keyPair.publicKey);
+  const privateKey = await crypto.subtle.exportKey('jwk', keyPair.privateKey);
+  const stored: StoredKeyPair = { publicKey, privateKey };
+
+  await encryptStoredKeyPair(address, stored, passphrase);
+  return stored;
+}
+
+function aadFor(meta: EncryptedPayloadV3['meta'], role: 'sender' | 'recipient') {
+  return [
+    'arcanum',
+    'v3',
+    String(meta.chainId),
+    meta.contractAddress.toLowerCase(),
+    meta.sender.toLowerCase(),
+    meta.recipient.toLowerCase(),
+    meta.senderKeyId,
+    meta.recipientKeyId,
+    role,
+  ].join('|');
+}
+
+export async function ensureEncryptionKeyPair(address: string, passphrase?: string) {
+  const stored = await readKeyPair(address, passphrase, true);
+
+  return {
+    publicKey: publicKeyString(stored.publicKey),
+    privateKey: stored.privateKey,
+  };
+}
+
+export async function unlockEncryptionKey(address: string, passphrase: string) {
+  const stored = await readKeyPair(address, passphrase, false);
+
+  return {
+    publicKey: publicKeyString(stored.publicKey),
+    privateKey: stored.privateKey,
+  };
+}
+
+export function hasStoredEncryptionKey(address: string) {
+  return Boolean(localStorage.getItem(storageKey(address)));
+}
+
+export function isEncryptionKeyUnlocked(address: string) {
+  return sessionKeys.has(storageKey(address));
+}
+
+export async function exportEncryptionKey(address: string, passphrase: string) {
+  if (!passphrase) {
+    throw new Error('PASSPHRASE_REQUIRED');
+  }
+
+  const stored = await readKeyPair(address, passphrase, false);
+  const publicKey = publicKeyString(stored.publicKey);
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const backupKey = await deriveBackupKey(passphrase, salt);
-  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, backupKey, textEncoder.encode(existing));
+  const backupKey = await derivePasswordKey(passphrase, salt, backupKdfIterations);
+  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, backupKey, textEncoder.encode(JSON.stringify(stored)));
   const backup: EncryptedKeyBackup = {
     version: 1,
     app: 'arcanum',
     alg: 'PBKDF2-SHA256-AES-GCM',
-    address: address.toLowerCase(),
+    address: normalizeAddress(address),
     publicKey,
     createdAt: new Date().toISOString(),
     kdf: {
@@ -214,17 +393,25 @@ export async function importEncryptionKey(address: string, backupJson: string, p
     throw new Error('INVALID_KEY_BACKUP');
   }
 
+  if (backup.address !== normalizeAddress(address)) {
+    throw new Error('KEY_BACKUP_ADDRESS_MISMATCH');
+  }
+
   const salt = decodeBase64Url(backup.kdf.salt);
-  const backupKey = await deriveBackupKey(passphrase, salt);
+  const backupKey = await derivePasswordKey(passphrase, salt, backup.kdf.iterations);
   const decrypted = await crypto.subtle.decrypt(
     { name: 'AES-GCM', iv: decodeBase64Url(backup.iv) },
     backupKey,
     decodeBase64Url(backup.data),
   );
   const stored = JSON.parse(textDecoder.decode(decrypted)) as StoredKeyPair;
-  const publicKey = encodeBase64Url(JSON.stringify(stored.publicKey));
+  const publicKey = publicKeyString(stored.publicKey);
 
-  localStorage.setItem(storageKey(address), JSON.stringify(stored));
+  if (publicKey !== backup.publicKey) {
+    throw new Error('KEY_BACKUP_PUBLIC_MISMATCH');
+  }
+
+  await encryptStoredKeyPair(address, stored, passphrase);
 
   return {
     publicKey,
@@ -233,49 +420,80 @@ export async function importEncryptionKey(address: string, backupJson: string, p
   };
 }
 
-export async function encryptMessage(message: string, recipientPublicKey: string, senderAddress: string) {
-  const senderKeys = await ensureEncryptionKeyPair(senderAddress);
+export async function encryptMessage(
+  message: string,
+  recipientPublicKey: string,
+  senderAddress: string,
+  recipientAddress: string,
+  context: Pick<MessageCryptoContext, 'chainId' | 'contractAddress'>,
+  passphrase?: string,
+) {
+  const senderKeys = await ensureEncryptionKeyPair(senderAddress, passphrase);
   const senderPrivateKey = await importPrivateKey(senderKeys.privateKey);
   const recipientKey = await importPublicKey(recipientPublicKey);
   const senderKey = await importPublicKey(senderKeys.publicKey);
-  const recipientAesKey = await deriveAesKey(senderPrivateKey, recipientKey);
-  const senderAesKey = await deriveAesKey(senderPrivateKey, senderKey);
-
-  const payload: EncryptedPayloadV2 = {
-    version: 2,
-    alg: 'ECDH-P256-AES-GCM',
+  const meta: EncryptedPayloadV3['meta'] = {
+    chainId: context.chainId,
+    contractAddress: context.contractAddress,
+    sender: normalizeAddress(senderAddress),
+    recipient: normalizeAddress(recipientAddress),
     senderPublicKey: senderKeys.publicKey,
     recipientPublicKey,
-    recipient: await encryptCopy(message, recipientAesKey),
-    sender: await encryptCopy(message, senderAesKey),
+    senderKeyId: await sha256Base64Url(senderKeys.publicKey),
+    recipientKeyId: await sha256Base64Url(recipientPublicKey),
+  };
+
+  const recipientAad = aadFor(meta, 'recipient');
+  const senderAad = aadFor(meta, 'sender');
+  const recipientAesKey = await deriveV3AesKey(senderPrivateKey, recipientKey, recipientAad);
+  const senderAesKey = await deriveV3AesKey(senderPrivateKey, senderKey, senderAad);
+
+  const payload: EncryptedPayloadV3 = {
+    version: 3,
+    alg: 'ECDH-P256-HKDF-SHA256-AES-GCM',
+    meta,
+    recipient: await encryptCopy(message, recipientAesKey, recipientAad),
+    sender: await encryptCopy(message, senderAesKey, senderAad),
   };
 
   return JSON.stringify(payload);
 }
 
 export async function decryptMessage(payload: string, viewerAddress: string) {
-  const viewerKeys = await ensureEncryptionKeyPair(viewerAddress);
+  const viewerKeys = await readKeyPair(viewerAddress, undefined, false);
   const parsed = JSON.parse(payload) as EncryptedPayload;
   const viewerPrivateKey = await importPrivateKey(viewerKeys.privateKey);
+  const viewerPublicKey = publicKeyString(viewerKeys.publicKey);
 
   if (parsed.version === 1) {
     const senderPublicKey = await importPublicKey(parsed.senderPublicKey);
-    const aesKey = await deriveAesKey(viewerPrivateKey, senderPublicKey);
+    const aesKey = await deriveLegacyAesKey(viewerPrivateKey, senderPublicKey);
     return decryptCopy({ iv: parsed.iv, data: parsed.data }, aesKey);
   }
 
-  if (parsed.version !== 2) {
-    throw new Error('Unsupported private payload version.');
+  if (parsed.version === 2) {
+    const senderPublicKey = await importPublicKey(parsed.senderPublicKey);
+    const aesKey = await deriveLegacyAesKey(viewerPrivateKey, senderPublicKey);
+    const preferredCopy = viewerPublicKey === parsed.senderPublicKey ? parsed.sender : parsed.recipient;
+
+    try {
+      return await decryptCopy(preferredCopy, aesKey);
+    } catch {
+      const fallbackCopy = preferredCopy === parsed.sender ? parsed.recipient : parsed.sender;
+      return decryptCopy(fallbackCopy, aesKey);
+    }
   }
 
-  const senderPublicKey = await importPublicKey(parsed.senderPublicKey);
-  const aesKey = await deriveAesKey(viewerPrivateKey, senderPublicKey);
-  const preferredCopy = viewerKeys.publicKey === parsed.senderPublicKey ? parsed.sender : parsed.recipient;
-
-  try {
-    return await decryptCopy(preferredCopy, aesKey);
-  } catch (error) {
-    const fallbackCopy = preferredCopy === parsed.sender ? parsed.recipient : parsed.sender;
-    return decryptCopy(fallbackCopy, aesKey);
+  if (parsed.version !== 3) {
+    throw new Error('UNSUPPORTED_PRIVATE_PAYLOAD');
   }
+
+  const isSender = viewerPublicKey === parsed.meta.senderPublicKey || normalizeAddress(viewerAddress) === parsed.meta.sender;
+  const role = isSender ? 'sender' : 'recipient';
+  const copy = isSender ? parsed.sender : parsed.recipient;
+  const peerPublicKey = await importPublicKey(isSender ? parsed.meta.senderPublicKey : parsed.meta.senderPublicKey);
+  const aad = aadFor(parsed.meta, role);
+  const aesKey = await deriveV3AesKey(viewerPrivateKey, peerPublicKey, aad);
+
+  return decryptCopy(copy, aesKey, aad);
 }
