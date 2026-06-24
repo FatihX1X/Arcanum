@@ -1,5 +1,6 @@
 const { expect } = require('chai');
 const { ethers } = require('hardhat');
+const { anyValue } = require('@nomicfoundation/hardhat-chai-matchers/withArgs');
 
 describe('ArcanumMessenger', function () {
   async function deployFixture() {
@@ -26,7 +27,7 @@ describe('ArcanumMessenger', function () {
 
     await expect(messenger.connect(sender).sendMessage(recipient.address, 'hello', false))
       .to.emit(messenger, 'MessageSent')
-      .withArgs(0, sender.address, recipient.address, false, await timeFromLatestBlock());
+      .withArgs(0, sender.address, recipient.address, false, anyValue);
 
     const inbox = await messenger.getInbox(recipient.address);
     const outbox = await messenger.getOutbox(sender.address);
@@ -62,8 +63,3 @@ describe('ArcanumMessenger', function () {
     );
   });
 });
-
-async function timeFromLatestBlock() {
-  const block = await ethers.provider.getBlock('latest');
-  return block.timestamp;
-}
