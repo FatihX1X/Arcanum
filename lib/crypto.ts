@@ -31,6 +31,23 @@ type EncryptedPayloadV2 = {
 
 type EncryptedPayload = EncryptedPayloadV1 | EncryptedPayloadV2;
 
+type EncryptedKeyBackup = {
+  version: 1;
+  app: 'arcanum';
+  alg: 'PBKDF2-SHA256-AES-GCM';
+  address: string;
+  publicKey: string;
+  createdAt: string;
+  kdf: {
+    iterations: number;
+    salt: string;
+  };
+  iv: string;
+  data: string;
+};
+
+const backupKdfIterations = 250000;
+
 function storageKey(address: string) {
   return `${storagePrefix}${address.toLowerCase()}`;
 }
@@ -58,6 +75,10 @@ function decodeBase64Url(value: string) {
   return bytes;
 }
 
+function toArrayBuffer(bytes: Uint8Array) {
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+}
+
 async function importPublicKey(publicKey: string) {
   const jwk = JSON.parse(textDecoder.decode(decodeBase64Url(publicKey))) as JsonWebKey;
   return crypto.subtle.importKey('jwk', jwk, { name: 'ECDH', namedCurve: 'P-256' }, true, []);
@@ -71,6 +92,23 @@ async function deriveAesKey(privateKey: CryptoKey, publicKey: CryptoKey) {
   return crypto.subtle.deriveKey(
     { name: 'ECDH', public: publicKey },
     privateKey,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt'],
+  );
+}
+
+async function deriveBackupKey(passphrase: string, salt: Uint8Array) {
+  const keyMaterial = await crypto.subtle.importKey('raw', textEncoder.encode(passphrase), 'PBKDF2', false, ['deriveKey']);
+
+  return crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      hash: 'SHA-256',
+      salt: toArrayBuffer(salt),
+      iterations: backupKdfIterations,
+    },
+    keyMaterial,
     { name: 'AES-GCM', length: 256 },
     false,
     ['encrypt', 'decrypt'],
@@ -123,6 +161,75 @@ export async function ensureEncryptionKeyPair(address: string) {
   return {
     publicKey: encodeBase64Url(JSON.stringify(publicKey)),
     privateKey,
+  };
+}
+
+export function hasStoredEncryptionKey(address: string) {
+  return Boolean(localStorage.getItem(storageKey(address)));
+}
+
+export async function exportEncryptionKey(address: string, passphrase: string) {
+  const existing = localStorage.getItem(storageKey(address));
+
+  if (!existing) {
+    throw new Error('NO_LOCAL_KEY');
+  }
+
+  if (!passphrase) {
+    throw new Error('PASSPHRASE_REQUIRED');
+  }
+
+  const parsed = JSON.parse(existing) as StoredKeyPair;
+  const publicKey = encodeBase64Url(JSON.stringify(parsed.publicKey));
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const backupKey = await deriveBackupKey(passphrase, salt);
+  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, backupKey, textEncoder.encode(existing));
+  const backup: EncryptedKeyBackup = {
+    version: 1,
+    app: 'arcanum',
+    alg: 'PBKDF2-SHA256-AES-GCM',
+    address: address.toLowerCase(),
+    publicKey,
+    createdAt: new Date().toISOString(),
+    kdf: {
+      iterations: backupKdfIterations,
+      salt: encodeBase64Url(salt),
+    },
+    iv: encodeBase64Url(iv),
+    data: encodeBase64Url(encrypted),
+  };
+
+  return JSON.stringify(backup, null, 2);
+}
+
+export async function importEncryptionKey(address: string, backupJson: string, passphrase: string) {
+  if (!passphrase) {
+    throw new Error('PASSPHRASE_REQUIRED');
+  }
+
+  const backup = JSON.parse(backupJson) as EncryptedKeyBackup;
+
+  if (backup.version !== 1 || backup.app !== 'arcanum' || backup.alg !== 'PBKDF2-SHA256-AES-GCM') {
+    throw new Error('INVALID_KEY_BACKUP');
+  }
+
+  const salt = decodeBase64Url(backup.kdf.salt);
+  const backupKey = await deriveBackupKey(passphrase, salt);
+  const decrypted = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: decodeBase64Url(backup.iv) },
+    backupKey,
+    decodeBase64Url(backup.data),
+  );
+  const stored = JSON.parse(textDecoder.decode(decrypted)) as StoredKeyPair;
+  const publicKey = encodeBase64Url(JSON.stringify(stored.publicKey));
+
+  localStorage.setItem(storageKey(address), JSON.stringify(stored));
+
+  return {
+    publicKey,
+    backupPublicKey: backup.publicKey,
+    matchesBackup: publicKey === backup.publicKey,
   };
 }
 
