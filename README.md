@@ -17,6 +17,7 @@ A private on-chain messenger for Arc Network Testnet.
 - RPC URL: `https://rpc.testnet.arc.network`
 - Explorer: `https://testnet.arcscan.app`
 - Native gas token: `USDC`
+- ArcanumMessenger: `0xC5E634BBA75bB25758E15247E7C07Da889301584`
 
 ## Local Setup
 
@@ -26,7 +27,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Set the deployed contract address in `.env.local` before using the app:
+The default config points to the deployed Arc Testnet contract. Override it in `.env.local` only when deploying a new contract:
 
 ```bash
 NEXT_PUBLIC_CONTRACT_ADDRESS=0x...
