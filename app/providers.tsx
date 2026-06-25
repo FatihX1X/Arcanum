@@ -15,7 +15,7 @@ const config = createConfig({
     }),
   ],
   transports: {
-    [arcNetworkTestnet.id]: http(),
+    [arcNetworkTestnet.id]: http(arcNetworkTestnet.rpcUrls.default.http[0]),
   },
 });
 
