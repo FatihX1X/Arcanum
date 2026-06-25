@@ -27,6 +27,37 @@ body {
   background: rgba(52, 211, 153, 0.35);
 }
 
+@keyframes arcanum-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes arcanum-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes arcanum-soft-scale {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 @layer components {
   .app-shell {
     @apply mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-[1500px] flex-col gap-4 px-3 py-4 sm:px-4 lg:px-6;
@@ -34,6 +65,7 @@ body {
 
   .surface {
     @apply rounded-lg border border-zinc-800/90 bg-zinc-950/95 shadow-2xl shadow-black/25;
+    transition: border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
   }
 
   .panel {
@@ -54,6 +86,7 @@ body {
 
   .input {
     @apply w-full rounded-md border border-zinc-800 bg-zinc-950 px-3.5 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/10 disabled:cursor-not-allowed disabled:opacity-60;
+    transition-duration: 180ms;
   }
 
   input.input {
@@ -62,18 +95,22 @@ body {
 
   .btn-primary {
     @apply inline-flex items-center justify-center gap-2 rounded-md bg-emerald-400 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500;
+    transition-duration: 180ms;
   }
 
   .btn-ghost {
     @apply inline-flex items-center justify-center gap-2 rounded-md border border-zinc-700 text-sm font-medium text-zinc-200 transition hover:border-zinc-500 hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-50;
+    transition-duration: 180ms;
   }
 
   .btn-subtle {
     @apply inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium text-zinc-300 transition hover:bg-zinc-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-50;
+    transition-duration: 180ms;
   }
 
   .nav-item {
     @apply flex w-full items-center gap-3 rounded-md border px-3 py-2.5 text-left text-sm transition;
+    transition-duration: 180ms;
   }
 
   .nav-item-active {
@@ -86,6 +123,7 @@ body {
 
   .chat-card {
     @apply rounded-lg border border-zinc-800 bg-zinc-950 transition hover:border-zinc-700 hover:bg-zinc-900/70;
+    transition-duration: 180ms;
   }
 
   .modal-backdrop {
@@ -102,5 +140,38 @@ body {
 
   .helper-danger {
     @apply rounded-md border border-red-400/25 bg-red-400/10 px-3 py-2 text-sm text-red-200;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .surface {
+    animation: arcanum-fade-in 180ms ease-out both;
+  }
+
+  .panel {
+    animation: arcanum-slide-up 220ms ease-out both;
+  }
+
+  .modal-panel {
+    animation: arcanum-soft-scale 160ms ease-out both;
+  }
+
+  .btn-primary:not(:disabled):hover,
+  .btn-ghost:not(:disabled):hover,
+  .btn-subtle:not(:disabled):hover,
+  .nav-item:hover,
+  .chat-card:hover {
+    transform: translateY(-1px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
   }
 }
