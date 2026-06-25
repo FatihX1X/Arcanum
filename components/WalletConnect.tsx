@@ -4,6 +4,7 @@ import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   Archive,
+  Bot,
   CheckCircle2,
   Clock3,
   Download,
@@ -18,11 +19,11 @@ import {
   Lock,
   Menu,
   MessageCircle,
+  Github,
   RefreshCw,
   Search,
   Send,
   Shield,
-  ShieldCheck,
   Upload,
   Wallet,
   Wifi,
@@ -59,15 +60,20 @@ import {
   isEncryptionKeyUnlocked,
   unlockEncryptionKey,
 } from '../lib/crypto';
+import AgentMessages from './AgentMessages';
 import { copy, type Language } from './arcanumCopy';
 
 type PrivacyMode = 'private' | 'public';
-type AppView = 'dm' | 'history' | 'about' | 'faq';
+type AppView = 'dm' | 'agents' | 'history' | 'about' | 'faq';
 type HistoryTab = 'inbox' | 'sent';
 type KeyModalMode = 'unlock' | 'register' | 'export' | 'import' | null;
 type TransactionStep = 'idle' | 'preparing' | 'wallet' | 'pending' | 'success' | 'error';
 type EthereumProvider = {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+};
+type ProviderError = {
+  code?: number;
+  message?: string;
 };
 
 type Conversation = {
@@ -77,6 +83,8 @@ type Conversation = {
 };
 
 const historyPageSize = 8;
+const xProfileUrl = 'https://x.com/0xFatih';
+const githubRepoUrl = 'https://github.com/FatihX1X/Arcanum';
 
 function short(address: string) {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
@@ -190,7 +198,7 @@ export default function WalletConnect() {
     abi: arcanumMessengerAbi,
     functionName: 'encryptionKeys',
     args: [connectedAddress],
-    query: { enabled: isConnected && isArcanumMessengerConfigured },
+    query: { enabled: isConnected && isCorrectChain && isArcanumMessengerConfigured },
   });
 
   const { data: recipientKey } = useReadContract({
@@ -198,7 +206,7 @@ export default function WalletConnect() {
     abi: arcanumMessengerAbi,
     functionName: 'encryptionKeys',
     args: [recipientValid ? (activeRecipient as `0x${string}`) : zeroAddress],
-    query: { enabled: isConnected && isArcanumMessengerConfigured && privacy === 'private' && recipientValid },
+    query: { enabled: isConnected && isCorrectChain && isArcanumMessengerConfigured && privacy === 'private' && recipientValid },
   });
 
   const { data: inboxMessages, refetch: refetchInbox, isFetching: inboxFetching } = useReadContract({
@@ -206,7 +214,7 @@ export default function WalletConnect() {
     abi: arcanumMessengerAbi,
     functionName: 'getInbox',
     args: [connectedAddress],
-    query: { enabled: isConnected && isArcanumMessengerConfigured },
+    query: { enabled: isConnected && isCorrectChain && isArcanumMessengerConfigured },
   });
 
   const { data: sentMessages, refetch: refetchSent, isFetching: sentFetching } = useReadContract({
@@ -214,7 +222,7 @@ export default function WalletConnect() {
     abi: arcanumMessengerAbi,
     functionName: 'getOutbox',
     args: [connectedAddress],
-    query: { enabled: isConnected && isArcanumMessengerConfigured },
+    query: { enabled: isConnected && isCorrectChain && isArcanumMessengerConfigured },
   });
 
   const receipt = useWaitForTransactionReceipt({ hash: pendingHash, query: { enabled: Boolean(pendingHash) } });
@@ -343,21 +351,51 @@ export default function WalletConnect() {
 
   async function switchToArc() {
     setFlowError('');
+    const params = arcAddEthereumChainParams();
+    const provider = (window as Window & { ethereum?: EthereumProvider }).ethereum;
+
     try {
-      await switchChainAsync({ chainId: arcNetworkTestnet.id });
-    } catch {
+      if (!provider) {
+        await switchChainAsync({ chainId: arcNetworkTestnet.id });
+        return;
+      }
+
       try {
-        const provider = (window as Window & { ethereum?: EthereumProvider }).ethereum;
-        await provider?.request({ method: 'wallet_addEthereumChain', params: [arcAddEthereumChainParams()] });
+        await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: params.chainId }] });
+        return;
+      } catch (error) {
+        const walletError = error as ProviderError;
+        const message = walletError.message?.toLowerCase() ?? '';
+        const unknownChain =
+          walletError.code === 4902 ||
+          message.includes('unrecognized') ||
+          message.includes('unknown chain') ||
+          message.includes('not added') ||
+          message.includes('does not exist');
+
+        if (!unknownChain) {
+          throw error;
+        }
+
+        await provider.request({ method: 'wallet_addEthereumChain', params: [params] });
+        await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: params.chainId }] });
+      }
+    } catch (error) {
+      try {
+        await switchChainAsync({ chainId: arcNetworkTestnet.id });
       } catch {
         setTxStep('error');
         setStatus(t.status.switchRejected);
-        setFlowError(t.status.switchRejected);
+        setFlowError(readableError(error, t) || t.status.switchRejected);
       }
     }
   }
 
   async function refreshMessages() {
+    if (!isConnected || !isCorrectChain) {
+      return;
+    }
+
     await Promise.all([refetchInbox(), refetchSent()]);
   }
 
@@ -617,11 +655,14 @@ export default function WalletConnect() {
           />
         ) : null}
 
+        {view === 'agents' ? <AgentMessages language={language} /> : null}
+
         {view === 'history' ? (
           <HistoryView
             t={t}
             language={language}
             isConnected={isConnected}
+            isCorrectChain={isCorrectChain}
             viewer={address}
             tab={historyTab}
             messages={visibleHistory}
@@ -657,6 +698,8 @@ export default function WalletConnect() {
         onMode={openKeyModal}
         onSubmit={runKeyModalAction}
       />
+
+      <AppFooter />
     </div>
   );
 }
@@ -699,12 +742,8 @@ function AppHeader({
           <button type="button" onClick={onMenu} className="btn-ghost h-10 w-10 lg:hidden" aria-label={menuOpen ? t.header.close : t.header.menu}>
             {menuOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
-          <img src="/arcanum-logo.png" alt="Arcanum logo" className="h-11 w-11 rounded-md border border-zinc-800 object-cover" />
+          <img src="/arcanum-logo.png" alt="Arcanum logo" className="h-9 w-28 object-contain sm:h-11 sm:w-40" />
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="truncate text-xl font-semibold text-white">Arcanum</h1>
-              <Pill tone="info" icon={<ShieldCheck size={13} />} label={t.header.live} />
-            </div>
             <p className="truncate text-xs text-zinc-500">{t.header.tagline}</p>
           </div>
         </div>
@@ -714,11 +753,13 @@ function AppHeader({
             <Languages size={14} />
             {language.toUpperCase()}
           </button>
-          <Pill tone={isCorrectChain ? 'success' : 'warning'} icon={<Wifi size={13} />} label={isCorrectChain ? t.header.ready : t.header.wrong} />
           {!isCorrectChain && isConnected ? (
-            <button type="button" onClick={onSwitch} disabled={isSwitchPending} className="btn-ghost h-9 px-3 text-xs">
-              {isSwitchPending ? t.header.switching : t.header.switch}
-            </button>
+            <>
+              <Pill tone="warning" icon={<Wifi size={13} />} label={t.header.wrong} />
+              <button type="button" onClick={onSwitch} disabled={isSwitchPending} className="btn-ghost h-9 px-3 text-xs">
+                {isSwitchPending ? t.header.switching : t.header.switch}
+              </button>
+            </>
           ) : null}
           <Pill tone="info" label={`${t.header.contract} ${short(arcanumMessengerAddress)}`} />
           {isConnected && address ? (
@@ -735,6 +776,24 @@ function AppHeader({
         </div>
       </div>
     </header>
+  );
+}
+
+function AppFooter() {
+  return (
+    <footer className="surface flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-xs text-zinc-500">Arcanum Private Messaging Protocol</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <a href={xProfileUrl} target="_blank" rel="noreferrer" className="btn-ghost h-9 px-3 text-xs">
+          <span className="font-semibold">X</span>
+          0xFatih
+        </a>
+        <a href={githubRepoUrl} target="_blank" rel="noreferrer" className="btn-ghost h-9 px-3 text-xs">
+          <Github size={14} />
+          GitHub
+        </a>
+      </div>
+    </footer>
   );
 }
 
@@ -765,6 +824,7 @@ function AppSidebar({
 }) {
   const items: Array<{ view: AppView; label: string; icon: JSX.Element }> = [
     { view: 'dm', label: t.nav.dm, icon: <MessageCircle size={16} /> },
+    { view: 'agents', label: t.nav.agents, icon: <Bot size={16} /> },
     { view: 'history', label: t.nav.history, icon: <History size={16} /> },
     { view: 'about', label: t.nav.about, icon: <Info size={16} /> },
     { view: 'faq', label: t.nav.faq, icon: <HelpCircle size={16} /> },
@@ -887,6 +947,7 @@ function DirectMessagesView({
         t={t}
         language={language}
         isConnected={isConnected}
+        isCorrectChain={isCorrectChain}
         conversations={conversations}
         allConversationCount={allConversationCount}
         activeRecipient={activeRecipient}
@@ -933,6 +994,7 @@ function ConversationList({
   t,
   language,
   isConnected,
+  isCorrectChain,
   conversations,
   allConversationCount,
   activeRecipient,
@@ -949,6 +1011,7 @@ function ConversationList({
   t: (typeof copy)[Language];
   language: Language;
   isConnected: boolean;
+  isCorrectChain: boolean;
   conversations: Conversation[];
   allConversationCount: number;
   activeRecipient: string;
@@ -962,7 +1025,7 @@ function ConversationList({
   onSelect: (address: `0x${string}`) => void;
   onRefresh: () => void;
 }) {
-  const showEmptySearch = isConnected && allConversationCount > 0 && conversations.length === 0;
+  const showEmptySearch = isConnected && isCorrectChain && allConversationCount > 0 && conversations.length === 0;
 
   return (
     <aside className="panel min-h-[560px]">
@@ -971,7 +1034,7 @@ function ConversationList({
           <p className="eyebrow">DM</p>
           <h2 className="panel-title">{t.dm.title}</h2>
         </div>
-        <button type="button" onClick={onRefresh} disabled={!isConnected} className="btn-ghost h-10 w-10" aria-label={t.history.refresh}>
+        <button type="button" onClick={onRefresh} disabled={!isConnected || !isCorrectChain} className="btn-ghost h-10 w-10" aria-label={t.history.refresh}>
           <RefreshCw size={16} className={isFetching ? 'animate-spin' : ''} />
         </button>
       </div>
@@ -979,18 +1042,19 @@ function ConversationList({
       <div className="mt-4 grid gap-3">
         <label className="grid gap-2">
           <span className="text-xs font-medium text-zinc-500">{t.dm.newChat}</span>
-          <input value={newRecipient} onChange={(event) => onRecipient(event.target.value)} placeholder={t.dm.recipient} className="input" />
+          <input value={newRecipient} onChange={(event) => onRecipient(event.target.value)} disabled={!isConnected || !isCorrectChain} placeholder={t.dm.recipient} className="input" />
         </label>
 
         <label className="relative">
           <Search size={15} className="pointer-events-none absolute left-3 top-3.5 text-zinc-600" />
-          <input value={search} onChange={(event) => onSearch(event.target.value)} placeholder={t.dm.search} className="input pl-9" />
+          <input value={search} onChange={(event) => onSearch(event.target.value)} disabled={!isConnected || !isCorrectChain} placeholder={t.dm.search} className="input pl-9" />
         </label>
       </div>
 
       <div className="mt-4 grid max-h-[520px] gap-2 overflow-y-auto pr-1">
         {!isConnected ? <Empty title={t.common.disconnected} body={t.dm.noWallet} /> : null}
-        {isConnected && allConversationCount === 0 ? <Empty title={t.dm.empty} body={t.dm.choose} /> : null}
+        {isConnected && !isCorrectChain ? <Empty title={t.header.wrong} body={t.header.switch} /> : null}
+        {isConnected && isCorrectChain && allConversationCount === 0 ? <Empty title={t.dm.empty} body={t.dm.choose} /> : null}
         {showEmptySearch ? <Empty title={t.common.empty} body={t.dm.search} /> : null}
         {conversations.map((conversation) => (
           <ConversationButton
@@ -1115,9 +1179,10 @@ function ChatPanel({
       </div>
 
       <div className="mt-4 flex min-h-[360px] flex-1 flex-col gap-3 overflow-y-auto rounded-lg border border-zinc-800 bg-black/30 p-3">
-        {!hasValidPeer ? <Empty title={t.dm.empty} body={t.dm.choose} /> : null}
-        {hasValidPeer && messages.length === 0 ? <Empty title={t.dm.newConversation} body={t.dm.choose} /> : null}
-        {messages.map((item) => (
+        {isConnected && !isCorrectChain ? <Empty title={t.header.wrong} body={t.header.switch} /> : null}
+        {isCorrectChain && !hasValidPeer ? <Empty title={t.dm.empty} body={t.dm.choose} /> : null}
+        {isCorrectChain && hasValidPeer && messages.length === 0 ? <Empty title={t.dm.newConversation} body={t.dm.choose} /> : null}
+        {isCorrectChain && messages.map((item) => (
           <MessageBubble key={item.id.toString()} message={item} viewer={viewer} language={language} t={t} />
         ))}
       </div>
@@ -1180,7 +1245,7 @@ function ChatComposer({
       <textarea
         value={message}
         onChange={(event) => onMessage(event.target.value)}
-        disabled={!isConnected}
+        disabled={!isConnected || !isCorrectChain}
         maxLength={280}
         rows={3}
         placeholder={t.composer.placeholder}
@@ -1386,6 +1451,7 @@ function HistoryView({
   t,
   language,
   isConnected,
+  isCorrectChain,
   viewer,
   tab,
   messages,
@@ -1400,6 +1466,7 @@ function HistoryView({
   t: (typeof copy)[Language];
   language: Language;
   isConnected: boolean;
+  isCorrectChain: boolean;
   viewer?: `0x${string}`;
   tab: HistoryTab;
   messages: ChainMessage[];
@@ -1418,7 +1485,7 @@ function HistoryView({
           <p className="eyebrow">History</p>
           <h2 className="panel-title">{t.history.title}</h2>
         </div>
-        <button type="button" onClick={onRefresh} disabled={!isConnected} className="btn-ghost h-10 px-3">
+        <button type="button" onClick={onRefresh} disabled={!isConnected || !isCorrectChain} className="btn-ghost h-10 px-3">
           <RefreshCw size={16} className={isFetching ? 'animate-spin' : ''} />
           {t.history.refresh}
         </button>
@@ -1429,8 +1496,9 @@ function HistoryView({
       </div>
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
         {!isConnected ? <Empty title={t.common.disconnected} body={t.dm.noWallet} /> : null}
-        {isConnected && total === 0 ? <Empty title={t.history.empty} body={t.history.empty} /> : null}
-        {messages.map((item) => (
+        {isConnected && !isCorrectChain ? <Empty title={t.header.wrong} body={t.header.switch} /> : null}
+        {isConnected && isCorrectChain && total === 0 ? <Empty title={t.history.empty} body={t.history.empty} /> : null}
+        {isCorrectChain && messages.map((item) => (
           <MessageCard
             key={`${tab}-${item.id.toString()}`}
             message={item}

@@ -11,6 +11,7 @@
     "test:contracts": "hardhat test",
     "deploy": "hardhat run scripts/deploy.js --network arcTestnet",
     "deploy:arc": "hardhat run scripts/deploy.js --network arcTestnet",
+    "deploy:agents": "hardhat run scripts/deploy-agents.js --network arcTestnet",
     "fees:balance": "hardhat run scripts/fees-balance.js --network arcTestnet",
     "fees:claim": "hardhat run scripts/fees-claim.js --network arcTestnet"
   },

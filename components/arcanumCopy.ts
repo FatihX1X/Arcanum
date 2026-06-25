@@ -2,6 +2,7 @@ export const copy = {
   en: {
     nav: {
       dm: 'Direct Messages',
+      agents: 'Agent Messages',
       history: 'Inbox / Sent',
       about: 'About Arcanum',
       faq: 'FAQ',
@@ -155,6 +156,7 @@ export const copy = {
   tr: {
     nav: {
       dm: 'Direkt Mesajlar',
+      agents: 'Agent Mesajlari',
       history: 'Inbox / Sent',
       about: 'Arcanum Hakkında',
       faq: 'SSS',
