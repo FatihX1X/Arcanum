@@ -12,13 +12,13 @@
 
 html {
   min-height: 100%;
-  background: #09090b;
+  background: #08090b;
 }
 
 body {
   min-height: 100%;
   margin: 0;
-  background: #09090b;
+  background: #08090b;
   -webkit-font-smoothing: antialiased;
   text-rendering: geometricPrecision;
 }
@@ -28,24 +28,32 @@ body {
 }
 
 @layer components {
+  .app-shell {
+    @apply mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-[1500px] flex-col gap-4 px-3 py-4 sm:px-4 lg:px-6;
+  }
+
+  .surface {
+    @apply rounded-lg border border-zinc-800/90 bg-zinc-950/95 shadow-2xl shadow-black/25;
+  }
+
   .panel {
-    @apply rounded-lg border border-zinc-800 bg-zinc-950/95 p-4 shadow-xl shadow-black/20 sm:p-5;
+    @apply surface p-4 sm:p-5;
   }
 
   .panel-header {
-    @apply flex flex-col gap-3 border-b border-zinc-800 pb-4 sm:flex-row sm:items-start sm:justify-between;
+    @apply flex flex-col gap-3 border-b border-zinc-800/80 pb-4 sm:flex-row sm:items-start sm:justify-between;
   }
 
   .panel-title {
-    @apply mt-1 text-lg font-semibold tracking-tight text-white;
+    @apply mt-1 text-lg font-semibold text-white;
   }
 
   .eyebrow {
-    @apply text-xs font-medium uppercase tracking-[0.16em] text-zinc-500;
+    @apply text-xs font-medium uppercase tracking-[0.14em] text-zinc-500;
   }
 
   .input {
-    @apply w-full rounded-md border border-zinc-800 bg-zinc-950 px-3.5 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-emerald-400 disabled:cursor-not-allowed disabled:opacity-60;
+    @apply w-full rounded-md border border-zinc-800 bg-zinc-950 px-3.5 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/10 disabled:cursor-not-allowed disabled:opacity-60;
   }
 
   input.input {
@@ -60,7 +68,39 @@ body {
     @apply inline-flex items-center justify-center gap-2 rounded-md border border-zinc-700 text-sm font-medium text-zinc-200 transition hover:border-zinc-500 hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-50;
   }
 
+  .btn-subtle {
+    @apply inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium text-zinc-300 transition hover:bg-zinc-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .nav-item {
+    @apply flex w-full items-center gap-3 rounded-md border px-3 py-2.5 text-left text-sm transition;
+  }
+
+  .nav-item-active {
+    @apply border-emerald-400/35 bg-emerald-400/10 text-emerald-100;
+  }
+
+  .nav-item-idle {
+    @apply border-transparent text-zinc-400 hover:border-zinc-800 hover:bg-zinc-900 hover:text-zinc-100;
+  }
+
+  .chat-card {
+    @apply rounded-lg border border-zinc-800 bg-zinc-950 transition hover:border-zinc-700 hover:bg-zinc-900/70;
+  }
+
+  .modal-backdrop {
+    @apply fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm;
+  }
+
+  .modal-panel {
+    @apply w-full max-w-lg rounded-lg border border-zinc-800 bg-zinc-950 p-5 shadow-2xl shadow-black/40;
+  }
+
   .helper-warning {
-    @apply text-sm text-amber-300;
+    @apply rounded-md border border-amber-300/25 bg-amber-300/10 px-3 py-2 text-sm text-amber-200;
+  }
+
+  .helper-danger {
+    @apply rounded-md border border-red-400/25 bg-red-400/10 px-3 py-2 text-sm text-red-200;
   }
 }
