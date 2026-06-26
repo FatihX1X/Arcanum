@@ -21,6 +21,7 @@ import {
   ensureEncryptionKeyPair,
   hasStoredEncryptionKey,
   isEncryptionKeyUnlocked,
+  assertPrivatePayloadV3,
   unlockEncryptionKey,
 } from '../lib/crypto';
 import type { Language } from './arcanumCopy';
@@ -448,6 +449,15 @@ export default function AgentMessages({ language }: { language: Language }) {
               { chainId: arcNetworkTestnet.id, contractAddress: arcanumAgentsAddress },
             )
           : message.trim();
+      if (privacy === 'private') {
+        await assertPrivatePayloadV3(payload, {
+          chainId: arcNetworkTestnet.id,
+          contractAddress: arcanumAgentsAddress,
+          senderAddress: address,
+          recipientAddress: activeRecipient as `0x${string}`,
+          recipientPublicKey: String(recipientKey),
+        });
+      }
       const hash = await writeContractAsync({
         address: arcanumAgentsAddress,
         abi: arcanumAgentsAbi,

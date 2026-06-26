@@ -89,6 +89,11 @@ export type MessageCryptoContext = {
   recipientAddress: string;
 };
 
+export type PrivatePayloadContext = MessageCryptoContext & {
+  senderPublicKey?: string;
+  recipientPublicKey?: string;
+};
+
 function storageKey(address: string) {
   return `${storagePrefix}${address.toLowerCase()}`;
 }
@@ -217,6 +222,26 @@ function isEncryptedLocalKey(value: unknown): value is EncryptedLocalKey {
   );
 }
 
+function isEncryptedCopy(value: unknown): value is EncryptedCopy {
+  return (
+    Boolean(value) &&
+    typeof value === 'object' &&
+    typeof (value as EncryptedCopy).iv === 'string' &&
+    typeof (value as EncryptedCopy).data === 'string' &&
+    (value as EncryptedCopy).iv.length > 0 &&
+    (value as EncryptedCopy).data.length > 0
+  );
+}
+
+function isLegacyStoredKeyPair(value: unknown): value is StoredKeyPair {
+  return (
+    Boolean(value) &&
+    typeof value === 'object' &&
+    typeof (value as StoredKeyPair).publicKey === 'object' &&
+    typeof (value as StoredKeyPair).privateKey === 'object'
+  );
+}
+
 async function encryptStoredKeyPair(address: string, stored: StoredKeyPair, passphrase: string) {
   const publicKey = publicKeyString(stored.publicKey);
   const salt = crypto.getRandomValues(new Uint8Array(16));
@@ -289,12 +314,11 @@ async function readKeyPair(address: string, passphrase?: string, createIfMissing
       return stored;
     }
 
-    if (!passphrase) {
+    if (isLegacyStoredKeyPair(parsed)) {
       throw new Error('LOCAL_KEY_REQUIRES_MIGRATION');
     }
 
-    await encryptStoredKeyPair(address, parsed, passphrase);
-    return parsed;
+    throw new Error('LOCAL_KEY_INVALID_FORMAT');
   }
 
   if (!createIfMissing) {
@@ -458,6 +482,61 @@ export async function encryptMessage(
   };
 
   return JSON.stringify(payload);
+}
+
+export async function assertPrivatePayloadV3(payload: string, expected: PrivatePayloadContext) {
+  let parsed: EncryptedPayloadV3;
+
+  try {
+    parsed = JSON.parse(payload) as EncryptedPayloadV3;
+  } catch {
+    throw new Error('PRIVATE_PAYLOAD_INVALID_JSON');
+  }
+
+  if (!parsed || parsed.version !== 3 || parsed.alg !== 'ECDH-P256-HKDF-SHA256-AES-GCM') {
+    throw new Error('PRIVATE_PAYLOAD_NOT_V3');
+  }
+
+  if (!parsed.meta || !isEncryptedCopy(parsed.sender) || !isEncryptedCopy(parsed.recipient)) {
+    throw new Error('PRIVATE_PAYLOAD_MISSING_FIELDS');
+  }
+
+  if (parsed.meta.chainId !== expected.chainId) {
+    throw new Error('PRIVATE_PAYLOAD_CHAIN_MISMATCH');
+  }
+
+  if (normalizeAddress(parsed.meta.contractAddress) !== normalizeAddress(expected.contractAddress)) {
+    throw new Error('PRIVATE_PAYLOAD_CONTRACT_MISMATCH');
+  }
+
+  if (normalizeAddress(parsed.meta.sender) !== normalizeAddress(expected.senderAddress)) {
+    throw new Error('PRIVATE_PAYLOAD_SENDER_MISMATCH');
+  }
+
+  if (normalizeAddress(parsed.meta.recipient) !== normalizeAddress(expected.recipientAddress)) {
+    throw new Error('PRIVATE_PAYLOAD_RECIPIENT_MISMATCH');
+  }
+
+  if (!parsed.meta.senderPublicKey || !parsed.meta.recipientPublicKey || !parsed.meta.senderKeyId || !parsed.meta.recipientKeyId) {
+    throw new Error('PRIVATE_PAYLOAD_KEY_METADATA_MISSING');
+  }
+
+  if (expected.senderPublicKey && parsed.meta.senderPublicKey !== expected.senderPublicKey) {
+    throw new Error('PRIVATE_PAYLOAD_SENDER_KEY_MISMATCH');
+  }
+
+  if (expected.recipientPublicKey && parsed.meta.recipientPublicKey !== expected.recipientPublicKey) {
+    throw new Error('PRIVATE_PAYLOAD_RECIPIENT_KEY_MISMATCH');
+  }
+
+  const senderKeyId = await sha256Base64Url(parsed.meta.senderPublicKey);
+  const recipientKeyId = await sha256Base64Url(parsed.meta.recipientPublicKey);
+
+  if (senderKeyId !== parsed.meta.senderKeyId || recipientKeyId !== parsed.meta.recipientKeyId) {
+    throw new Error('PRIVATE_PAYLOAD_KEY_ID_MISMATCH');
+  }
+
+  return parsed;
 }
 
 export async function decryptMessage(payload: string, viewerAddress: string) {

@@ -55,6 +55,48 @@ describe('ArcanumAgents', function () {
     expect(await agents.isActiveAgent(sender.address)).to.equal(false);
   });
 
+  it('does not expose sender parameters for agent profile, key registration, or messaging', async function () {
+    const { agents } = await deployFixture();
+    const registerAgent = agents.interface.getFunction('registerAgent');
+    const registerEncryptionKey = agents.interface.getFunction('registerEncryptionKey');
+    const sendAgentMessage = agents.interface.getFunction('sendAgentMessage');
+
+    expect(registerAgent.inputs.map((input) => input.name)).to.deep.equal(['name', 'description', 'metadataURI']);
+    expect(registerEncryptionKey.inputs.map((input) => input.name)).to.deep.equal(['publicKey']);
+    expect(sendAgentMessage.inputs.map((input) => input.name)).to.deep.equal([
+      'recipient',
+      'payload',
+      'isPrivate',
+      'paymentAmount',
+    ]);
+  });
+
+  it('always records the caller as agent owner, key owner, and message sender', async function () {
+    const { agents, sender, recipient, other, publicFee } = await deployFixture();
+
+    await agents.connect(other).registerAgent(sender.address, 'spoof attempt', '');
+    const otherProfile = await agents.getAgent(other.address);
+    const senderProfile = await agents.getAgent(sender.address);
+    expect(otherProfile.agentAddress).to.equal(other.address);
+    expect(otherProfile.name).to.equal(sender.address);
+    expect(senderProfile.registeredAt).to.equal(0);
+
+    await agents.connect(recipient).registerAgent('Recipient', '', '');
+    await agents.connect(other).registerEncryptionKey(sender.address);
+    expect(await agents.encryptionKeys(other.address)).to.equal(sender.address);
+    expect(await agents.encryptionKeys(sender.address)).to.equal('');
+
+    await agents.connect(other).sendAgentMessage(recipient.address, sender.address, false, 0, { value: publicFee });
+    const recipientInbox = await agents.getInbox(recipient.address);
+    const otherOutbox = await agents.getOutbox(other.address);
+    const senderOutbox = await agents.getOutbox(sender.address);
+
+    expect(recipientInbox[0].sender).to.equal(other.address);
+    expect(recipientInbox[0].payload).to.equal(sender.address);
+    expect(otherOutbox).to.have.lengthOf(1);
+    expect(senderOutbox).to.have.lengthOf(0);
+  });
+
   it('requires active agents for key registration and messaging', async function () {
     const { agents, sender, recipient, other, publicFee } = await deployFixture();
 

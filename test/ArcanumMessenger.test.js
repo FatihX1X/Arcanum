@@ -35,6 +35,33 @@ describe('ArcanumMessenger', function () {
     expect(await messenger.encryptionKeys(sender.address)).to.equal('{"kty":"EC"}');
   });
 
+  it('does not expose sender parameters for key registration or message sending', async function () {
+    const { messenger } = await deployFixture();
+    const sendMessage = messenger.interface.getFunction('sendMessage');
+    const registerEncryptionKey = messenger.interface.getFunction('registerEncryptionKey');
+
+    expect(sendMessage.inputs.map((input) => input.name)).to.deep.equal(['recipient', 'payload', 'isPrivate']);
+    expect(registerEncryptionKey.inputs.map((input) => input.name)).to.deep.equal(['publicKey']);
+  });
+
+  it('always records the caller as key owner and message sender', async function () {
+    const { messenger, sender, recipient, other, publicFee } = await deployFixture();
+
+    await messenger.connect(other).registerEncryptionKey(sender.address);
+    expect(await messenger.encryptionKeys(other.address)).to.equal(sender.address);
+    expect(await messenger.encryptionKeys(sender.address)).to.equal('');
+
+    await messenger.connect(other).sendMessage(recipient.address, sender.address, false, { value: publicFee });
+    const recipientInbox = await messenger.getInbox(recipient.address);
+    const otherOutbox = await messenger.getOutbox(other.address);
+    const senderOutbox = await messenger.getOutbox(sender.address);
+
+    expect(recipientInbox[0].sender).to.equal(other.address);
+    expect(recipientInbox[0].payload).to.equal(sender.address);
+    expect(otherOutbox).to.have.lengthOf(1);
+    expect(senderOutbox).to.have.lengthOf(0);
+  });
+
   it('sends a public message and indexes inbox and outbox', async function () {
     const { messenger, sender, recipient, publicFee } = await deployFixture();
 

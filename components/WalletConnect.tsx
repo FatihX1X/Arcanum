@@ -58,6 +58,7 @@ import {
   hasStoredEncryptionKey,
   importEncryptionKey,
   isEncryptionKeyUnlocked,
+  assertPrivatePayloadV3,
   unlockEncryptionKey,
 } from '../lib/crypto';
 import AgentMessages from './AgentMessages';
@@ -533,6 +534,15 @@ export default function WalletConnect() {
               { chainId: arcNetworkTestnet.id, contractAddress: arcanumMessengerAddress },
             )
           : trimmedMessage;
+      if (privacy === 'private') {
+        await assertPrivatePayloadV3(payload, {
+          chainId: arcNetworkTestnet.id,
+          contractAddress: arcanumMessengerAddress,
+          senderAddress: address as `0x${string}`,
+          recipientAddress: activeRecipient as `0x${string}`,
+          recipientPublicKey: String(recipientKey),
+        });
+      }
       refreshLocalKeyStatus();
       setTxStep('wallet');
       setStatus(t.status.wallet);
