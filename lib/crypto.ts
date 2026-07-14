@@ -578,237 +578,222 @@ export async function decryptMessage(payload: string, viewerAddress: string) {
   return decryptCopy(copy, aesKey, aad);
 }
 
-export type GroupMemberEncryptionKey = {
-  address: string;
-  publicKey: string;
-};
-
 export type GroupCryptoContext = {
   chainId: number;
   contractAddress: string;
-  groupId: bigint;
-  senderAddress: string;
-  membershipVersion: bigint;
+  groupId: `0x${string}`;
+  epoch: number;
 };
 
-export type GroupEncryptedMessage = {
-  ciphertext: `0x${string}`;
-  cryptoMeta: `0x${string}`;
-  wrappedKeys: `0x${string}`[];
+export type GroupMemberKey = {
+  address: `0x${string}`;
+  publicKey: string;
 };
 
-type GroupCryptoMetaV1 = {
+type GroupKeyEnvelopeV1 = {
   version: 1;
-  alg: 'ECDH-P256-HKDF-SHA256-AES-256-GCM';
-  chainId: number;
-  contractAddress: string;
-  groupId: string;
-  sender: string;
-  membershipVersion: string;
-  senderPublicKey: string;
-  senderKeyId: string;
+  alg: 'ECDH-P256-HKDF-SHA256-AES-GCM';
+  meta: GroupCryptoContext & {
+    distributor: string;
+    recipient: string;
+    distributorPublicKey: string;
+    recipientPublicKey: string;
+    distributorKeyId: string;
+    recipientKeyId: string;
+  };
+  key: EncryptedCopy;
 };
 
-function bytesToHex(bytes: Uint8Array): `0x${string}` {
-  return `0x${Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
-}
+type GroupCipherV1 = {
+  version: 1;
+  alg: 'AES-256-GCM';
+  kind: 'metadata' | 'message';
+  meta: GroupCryptoContext & {
+    sender?: string;
+    nonce?: string;
+  };
+  copy: EncryptedCopy;
+};
 
-function hexToBytes(value: string) {
-  if (!/^0x(?:[0-9a-fA-F]{2})*$/.test(value)) {
-    throw new Error('GROUP_PAYLOAD_INVALID_HEX');
-  }
-
-  const bytes = new Uint8Array((value.length - 2) / 2);
-  for (let i = 2; i < value.length; i += 2) {
-    bytes[(i - 2) / 2] = Number.parseInt(value.slice(i, i + 2), 16);
-  }
-  return bytes;
-}
-
-function concatBytes(...values: Uint8Array[]) {
-  const result = new Uint8Array(values.reduce((total, value) => total + value.length, 0));
-  let offset = 0;
-  values.forEach((value) => {
-    result.set(value, offset);
-    offset += value.length;
-  });
-  return result;
-}
-
-async function sha256Bytes(value: string) {
-  return new Uint8Array(await crypto.subtle.digest('SHA-256', textEncoder.encode(value)));
-}
-
-function groupCommonAad(meta: GroupCryptoMetaV1) {
+function groupContextAad(context: GroupCryptoContext) {
   return [
     'arcanum',
-    'group',
-    'v1',
-    String(meta.chainId),
-    normalizeAddress(meta.contractAddress),
-    meta.groupId,
-    normalizeAddress(meta.sender),
-    meta.membershipVersion,
-    meta.senderKeyId,
+    'group-v1',
+    String(context.chainId),
+    normalizeAddress(context.contractAddress),
+    context.groupId.toLowerCase(),
+    String(context.epoch),
   ].join('|');
 }
 
-function groupRecipientAad(meta: GroupCryptoMetaV1, recipient: string, recipientKeyId: string) {
-  return `${groupCommonAad(meta)}|${normalizeAddress(recipient)}|${recipientKeyId}`;
+function groupEnvelopeAad(meta: GroupKeyEnvelopeV1['meta']) {
+  return [
+    groupContextAad(meta),
+    'key-envelope',
+    normalizeAddress(meta.distributor),
+    normalizeAddress(meta.recipient),
+    meta.distributorKeyId,
+    meta.recipientKeyId,
+  ].join('|');
 }
 
-async function deriveGroupWrapKey(privateKey: CryptoKey, publicKey: CryptoKey, aad: string) {
-  const bits = await crypto.subtle.deriveBits({ name: 'ECDH', public: publicKey }, privateKey, 256);
-  const material = await crypto.subtle.importKey('raw', bits, 'HKDF', false, ['deriveKey']);
-  const salt = await crypto.subtle.digest('SHA-256', textEncoder.encode(`arcanum:group:v1:salt:${aad}`));
-  return crypto.subtle.deriveKey(
-    {
-      name: 'HKDF',
-      hash: 'SHA-256',
-      salt,
-      info: textEncoder.encode(`arcanum:group:v1:wrap:${aad}`),
-    },
-    material,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt', 'decrypt'],
-  );
+function groupCipherAad(payload: GroupCipherV1) {
+  const base = [groupContextAad(payload.meta), payload.kind];
+  if (payload.kind === 'message') {
+    base.push(normalizeAddress(payload.meta.sender ?? ''), payload.meta.nonce ?? '');
+  }
+  return base.join('|');
 }
 
-function parseGroupCryptoMeta(value: string) {
-  let parsed: GroupCryptoMetaV1;
-  try {
-    parsed = JSON.parse(textDecoder.decode(hexToBytes(value))) as GroupCryptoMetaV1;
-  } catch (error) {
-    if (error instanceof Error && error.message === 'GROUP_PAYLOAD_INVALID_HEX') {
-      throw error;
-    }
-    throw new Error('GROUP_META_INVALID');
+async function importGroupKey(groupKey: string) {
+  return crypto.subtle.importKey('raw', decodeBase64Url(groupKey), { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+}
+
+function assertGroupContext(actual: GroupCryptoContext, expected: GroupCryptoContext) {
+  if (actual.chainId !== expected.chainId) throw new Error('GROUP_CHAIN_MISMATCH');
+  if (normalizeAddress(actual.contractAddress) !== normalizeAddress(expected.contractAddress)) throw new Error('GROUP_CONTRACT_MISMATCH');
+  if (actual.groupId.toLowerCase() !== expected.groupId.toLowerCase()) throw new Error('GROUP_ID_MISMATCH');
+  if (actual.epoch !== expected.epoch) throw new Error('GROUP_EPOCH_MISMATCH');
+}
+
+export function createRandomGroupId() {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return `0x${Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')}` as `0x${string}`;
+}
+
+export async function createGroupEncryption(
+  name: string,
+  ownerAddress: `0x${string}`,
+  members: GroupMemberKey[],
+  context: GroupCryptoContext,
+) {
+  const ownerKeys = await readKeyPair(ownerAddress, undefined, false);
+  const ownerPrivateKey = await importPrivateKey(ownerKeys.privateKey);
+  const distributorPublicKey = publicKeyString(ownerKeys.publicKey);
+  const registeredOwner = members.find((member) => normalizeAddress(member.address) === normalizeAddress(ownerAddress));
+  if (!registeredOwner || registeredOwner.publicKey !== distributorPublicKey) {
+    throw new Error('GROUP_OWNER_KEY_MISMATCH');
+  }
+  const distributorKeyId = await sha256Base64Url(distributorPublicKey);
+  const rawGroupKey = crypto.getRandomValues(new Uint8Array(32));
+  const groupKey = encodeBase64Url(rawGroupKey);
+  const aesKey = await importGroupKey(groupKey);
+
+  const envelopes = await Promise.all(members.map(async (member) => {
+    const recipientKey = await importPublicKey(member.publicKey);
+    const meta: GroupKeyEnvelopeV1['meta'] = {
+      ...context,
+      distributor: normalizeAddress(ownerAddress),
+      recipient: normalizeAddress(member.address),
+      distributorPublicKey,
+      recipientPublicKey: member.publicKey,
+      distributorKeyId,
+      recipientKeyId: await sha256Base64Url(member.publicKey),
+    };
+    const aad = groupEnvelopeAad(meta);
+    const envelopeKey = await deriveV3AesKey(ownerPrivateKey, recipientKey, aad);
+    const envelope: GroupKeyEnvelopeV1 = {
+      version: 1,
+      alg: 'ECDH-P256-HKDF-SHA256-AES-GCM',
+      meta,
+      key: await encryptCopy(groupKey, envelopeKey, aad),
+    };
+    return JSON.stringify(envelope);
+  }));
+
+  const metadata: GroupCipherV1 = {
+    version: 1,
+    alg: 'AES-256-GCM',
+    kind: 'metadata',
+    meta: context,
+    copy: { iv: '', data: '' },
+  };
+  metadata.copy = await encryptCopy(JSON.stringify({ name }), aesKey, groupCipherAad(metadata));
+
+  return { groupKey, encryptedMetadata: JSON.stringify(metadata), envelopes };
+}
+
+export async function openGroupKeyEnvelope(
+  envelopeJson: string,
+  viewerAddress: `0x${string}`,
+  expected: GroupCryptoContext,
+) {
+  const envelope = JSON.parse(envelopeJson) as GroupKeyEnvelopeV1;
+  if (envelope.version !== 1 || envelope.alg !== 'ECDH-P256-HKDF-SHA256-AES-GCM' || !isEncryptedCopy(envelope.key)) {
+    throw new Error('GROUP_ENVELOPE_INVALID');
+  }
+  assertGroupContext(envelope.meta, expected);
+  if (normalizeAddress(envelope.meta.recipient) !== normalizeAddress(viewerAddress)) {
+    throw new Error('GROUP_ENVELOPE_RECIPIENT_MISMATCH');
+  }
+  if (await sha256Base64Url(envelope.meta.distributorPublicKey) !== envelope.meta.distributorKeyId) {
+    throw new Error('GROUP_ENVELOPE_DISTRIBUTOR_KEY_MISMATCH');
+  }
+  if (await sha256Base64Url(envelope.meta.recipientPublicKey) !== envelope.meta.recipientKeyId) {
+    throw new Error('GROUP_ENVELOPE_RECIPIENT_KEY_MISMATCH');
   }
 
-  if (parsed.version !== 1 || parsed.alg !== 'ECDH-P256-HKDF-SHA256-AES-256-GCM') {
-    throw new Error('GROUP_META_UNSUPPORTED');
+  const viewerKeys = await readKeyPair(viewerAddress, undefined, false);
+  if (publicKeyString(viewerKeys.publicKey) !== envelope.meta.recipientPublicKey) {
+    throw new Error('GROUP_ENVELOPE_LOCAL_KEY_MISMATCH');
   }
-  return parsed;
+  const viewerPrivateKey = await importPrivateKey(viewerKeys.privateKey);
+  const distributorKey = await importPublicKey(envelope.meta.distributorPublicKey);
+  const aad = groupEnvelopeAad(envelope.meta);
+  const envelopeKey = await deriveV3AesKey(viewerPrivateKey, distributorKey, aad);
+  return decryptCopy(envelope.key, envelopeKey, aad);
 }
 
-function assertGroupMetaContext(meta: GroupCryptoMetaV1, expected: GroupCryptoContext) {
-  if (meta.chainId !== expected.chainId) throw new Error('GROUP_META_CHAIN_MISMATCH');
-  if (normalizeAddress(meta.contractAddress) !== normalizeAddress(expected.contractAddress)) throw new Error('GROUP_META_CONTRACT_MISMATCH');
-  if (meta.groupId !== expected.groupId.toString()) throw new Error('GROUP_META_ID_MISMATCH');
-  if (normalizeAddress(meta.sender) !== normalizeAddress(expected.senderAddress)) throw new Error('GROUP_META_SENDER_MISMATCH');
-  if (meta.membershipVersion !== expected.membershipVersion.toString()) throw new Error('GROUP_META_MEMBERSHIP_MISMATCH');
+export async function decryptGroupMetadata(
+  encryptedMetadata: string,
+  groupKey: string,
+  expected: GroupCryptoContext,
+) {
+  const payload = JSON.parse(encryptedMetadata) as GroupCipherV1;
+  if (payload.version !== 1 || payload.alg !== 'AES-256-GCM' || payload.kind !== 'metadata' || !isEncryptedCopy(payload.copy)) {
+    throw new Error('GROUP_METADATA_INVALID');
+  }
+  assertGroupContext(payload.meta, expected);
+  const aesKey = await importGroupKey(groupKey);
+  const decrypted = await decryptCopy(payload.copy, aesKey, groupCipherAad(payload));
+  return JSON.parse(decrypted) as { name: string };
 }
 
 export async function encryptGroupMessage(
   message: string,
-  memberKeys: readonly GroupMemberEncryptionKey[],
+  groupKey: string,
+  senderAddress: `0x${string}`,
   context: GroupCryptoContext,
-): Promise<GroupEncryptedMessage> {
-  const messageBytes = textEncoder.encode(message);
-  if (messageBytes.length === 0) throw new Error('GROUP_MESSAGE_REQUIRED');
-  if (messageBytes.length > 2048) throw new Error('GROUP_MESSAGE_TOO_LARGE');
-  if (memberKeys.length === 0 || memberKeys.length > 20) throw new Error('GROUP_MEMBER_COUNT_INVALID');
-
-  const senderStored = await readKeyPair(context.senderAddress, undefined, false);
-  const senderPublicKey = publicKeyString(senderStored.publicKey);
-  const senderMember = memberKeys.find((member) => normalizeAddress(member.address) === normalizeAddress(context.senderAddress));
-  if (!senderMember || senderMember.publicKey !== senderPublicKey) throw new Error('GROUP_SENDER_KEY_MISMATCH');
-
-  const seen = new Set<string>();
-  for (const member of memberKeys) {
-    const normalized = normalizeAddress(member.address);
-    if (seen.has(normalized)) throw new Error('GROUP_MEMBER_DUPLICATE');
-    if (!member.publicKey) throw new Error('GROUP_MEMBER_KEY_REQUIRED');
-    seen.add(normalized);
-  }
-
-  const meta: GroupCryptoMetaV1 = {
+) {
+  const payload: GroupCipherV1 = {
     version: 1,
-    alg: 'ECDH-P256-HKDF-SHA256-AES-256-GCM',
-    chainId: context.chainId,
-    contractAddress: normalizeAddress(context.contractAddress),
-    groupId: context.groupId.toString(),
-    sender: normalizeAddress(context.senderAddress),
-    membershipVersion: context.membershipVersion.toString(),
-    senderPublicKey,
-    senderKeyId: await sha256Base64Url(senderPublicKey),
+    alg: 'AES-256-GCM',
+    kind: 'message',
+    meta: {
+      ...context,
+      sender: normalizeAddress(senderAddress),
+      nonce: encodeBase64Url(crypto.getRandomValues(new Uint8Array(16))),
+    },
+    copy: { iv: '', data: '' },
   };
-  const commonAad = groupCommonAad(meta);
-  const senderPrivateKey = await importPrivateKey(senderStored.privateKey);
-  const rawMessageKey = crypto.getRandomValues(new Uint8Array(32));
-  const messageKey = await crypto.subtle.importKey('raw', rawMessageKey, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
-  const messageIv = crypto.getRandomValues(new Uint8Array(12));
-  const encryptedMessage = new Uint8Array(await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv: messageIv, additionalData: textEncoder.encode(commonAad) },
-    messageKey,
-    messageBytes,
-  ));
-
-  const wrappedKeys: `0x${string}`[] = [];
-  for (const member of memberKeys) {
-    const recipientKeyId = await sha256Bytes(member.publicKey);
-    const recipientKeyIdText = encodeBase64Url(recipientKeyId);
-    const recipientAad = groupRecipientAad(meta, member.address, recipientKeyIdText);
-    const recipientPublicKey = await importPublicKey(member.publicKey);
-    const wrapKey = await deriveGroupWrapKey(senderPrivateKey, recipientPublicKey, recipientAad);
-    const wrapIv = crypto.getRandomValues(new Uint8Array(12));
-    const encryptedKey = new Uint8Array(await crypto.subtle.encrypt(
-      { name: 'AES-GCM', iv: wrapIv, additionalData: textEncoder.encode(recipientAad) },
-      wrapKey,
-      rawMessageKey,
-    ));
-    wrappedKeys.push(bytesToHex(concatBytes(recipientKeyId, wrapIv, encryptedKey)));
-  }
-
-  return {
-    ciphertext: bytesToHex(concatBytes(messageIv, encryptedMessage)),
-    cryptoMeta: bytesToHex(textEncoder.encode(JSON.stringify(meta))),
-    wrappedKeys,
-  };
+  const aesKey = await importGroupKey(groupKey);
+  payload.copy = await encryptCopy(message, aesKey, groupCipherAad(payload));
+  return JSON.stringify(payload);
 }
 
 export async function decryptGroupMessage(
-  ciphertext: string,
-  cryptoMeta: string,
-  wrappedKey: string,
-  viewerAddress: string,
-  expected: GroupCryptoContext,
+  payloadJson: string,
+  groupKey: string,
+  expected: GroupCryptoContext & { sender?: string },
 ) {
-  const meta = parseGroupCryptoMeta(cryptoMeta);
-  assertGroupMetaContext(meta, expected);
-  const stored = await readKeyPair(viewerAddress, undefined, false);
-  const viewerPublicKey = publicKeyString(stored.publicKey);
-  const expectedKeyId = await sha256Bytes(viewerPublicKey);
-  const wrapped = hexToBytes(wrappedKey);
-  if (wrapped.length !== 92) throw new Error('GROUP_WRAPPED_KEY_INVALID');
-
-  const storedKeyId = wrapped.slice(0, 32);
-  if (!storedKeyId.every((value, index) => value === expectedKeyId[index])) {
-    throw new Error('GROUP_RECIPIENT_KEY_MISMATCH');
+  const payload = JSON.parse(payloadJson) as GroupCipherV1;
+  if (payload.version !== 1 || payload.alg !== 'AES-256-GCM' || payload.kind !== 'message' || !isEncryptedCopy(payload.copy)) {
+    throw new Error('GROUP_MESSAGE_INVALID');
   }
-
-  const senderKeyId = await sha256Base64Url(meta.senderPublicKey);
-  if (senderKeyId !== meta.senderKeyId) throw new Error('GROUP_SENDER_KEY_ID_MISMATCH');
-
-  const recipientKeyIdText = encodeBase64Url(storedKeyId);
-  const recipientAad = groupRecipientAad(meta, viewerAddress, recipientKeyIdText);
-  const viewerPrivateKey = await importPrivateKey(stored.privateKey);
-  const senderPublicKey = await importPublicKey(meta.senderPublicKey);
-  const wrapAesKey = await deriveGroupWrapKey(viewerPrivateKey, senderPublicKey, recipientAad);
-  const rawMessageKey = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: wrapped.slice(32, 44), additionalData: textEncoder.encode(recipientAad) },
-    wrapAesKey,
-    wrapped.slice(44),
-  );
-
-  const encrypted = hexToBytes(ciphertext);
-  if (encrypted.length < 29) throw new Error('GROUP_CIPHERTEXT_INVALID');
-  const messageKey = await crypto.subtle.importKey('raw', rawMessageKey, { name: 'AES-GCM' }, false, ['decrypt']);
-  const plaintext = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: encrypted.slice(0, 12), additionalData: textEncoder.encode(groupCommonAad(meta)) },
-    messageKey,
-    encrypted.slice(12),
-  );
-  return textDecoder.decode(plaintext);
+  assertGroupContext(payload.meta, expected);
+  if (expected.sender && normalizeAddress(payload.meta.sender ?? '') !== normalizeAddress(expected.sender)) {
+    throw new Error('GROUP_MESSAGE_SENDER_MISMATCH');
+  }
+  const aesKey = await importGroupKey(groupKey);
+  return decryptCopy(payload.copy, aesKey, groupCipherAad(payload));
 }

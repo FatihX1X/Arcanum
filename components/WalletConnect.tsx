@@ -67,8 +67,8 @@ import {
   unlockEncryptionKey,
 } from '../lib/crypto';
 import AgentMessages from './AgentMessages';
-import { BulkSender } from './BulkSender';
-import { GroupChat } from './GroupChat';
+import BulkSender from './BulkSender';
+import GroupMessages from './GroupMessages';
 import { copy, type Language } from './arcanumCopy';
 
 type PrivacyMode = 'private' | 'public';
@@ -674,12 +674,7 @@ export default function WalletConnect() {
 
         {view === 'agents' ? <AgentMessages language={language} /> : null}
 
-        {view === 'groups' ? (
-          <GroupChat
-            language={language}
-            onOpenKeyCenter={() => openKeyModal(hasOwnKey ? (localKeyStored ? 'unlock' : 'import') : 'register')}
-          />
-        ) : null}
+        {view === 'groups' ? <GroupMessages language={language} /> : null}
 
         {view === 'bulk' ? <BulkSender language={language} /> : null}
 

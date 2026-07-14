@@ -2,8 +2,8 @@ export const copy = {
   en: {
     nav: {
       dm: 'Direct Messages',
-      groups: 'Group Chat',
-      bulk: 'Bulk Sender',
+      groups: 'Encrypted Groups',
+      bulk: 'USDC Batch',
       agents: 'Agent Messages',
       history: 'Inbox / Sent',
       about: 'About Arcanum',
@@ -159,8 +159,8 @@ export const copy = {
   tr: {
     nav: {
       dm: 'Direkt Mesajlar',
-      groups: 'Grup Sohbeti',
-      bulk: 'Bulk Sender',
+      groups: 'Şifreli Gruplar',
+      bulk: 'USDC Batch',
       agents: 'Agent Mesajlari',
       history: 'Inbox / Sent',
       about: 'Arcanum Hakkında',

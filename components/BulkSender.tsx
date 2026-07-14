@@ -1,322 +1,262 @@
 'use client';
 
-import { FormEvent, useMemo, useState } from 'react';
-import {
-  CheckCircle2,
-  ClipboardPaste,
-  Coins,
-  ExternalLink,
-  History,
-  Plus,
-  RefreshCw,
-  Send,
-  ShieldCheck,
-  Trash2,
-  Users,
-} from 'lucide-react';
-import {
-  useAccount,
-  useChainId,
-  usePublicClient,
-  useReadContract,
-  useReadContracts,
-  useWriteContract,
-} from 'wagmi';
-import { formatUnits, maxUint256, zeroAddress, type Hex } from 'viem';
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
+import { CheckCircle2, ExternalLink, FileUp, Loader2, Plus, Send, Trash2, WalletCards, X } from 'lucide-react';
+import { formatEther, isAddress, parseEther } from 'viem';
+import { useAccount, useBalance, useChainId, usePublicClient, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 import { arcNetworkTestnet, transactionUrl } from '../lib/chain';
-import {
-  arcUsdcAbi,
-  arcUsdcAddress,
-  arcanumBulkAbi,
-  arcanumBulkAddress,
-  bulkBatchFee,
-  bulkBatchFeeLabel,
-  isArcanumBulkConfigured,
-  maxBulkRecipients,
-  type BulkBatch,
-} from '../lib/bulkContract';
-import { parseBulkPaste, prepareBulkRows, type BulkDraftRow } from '../lib/bulkUtils';
+import { arcanumBulkSenderAbi, arcanumBulkSenderAddress, isArcanumBulkSenderConfigured } from '../lib/bulkContract';
 import type { Language } from './arcanumCopy';
+
+type Row = { id: number; address: string; amount: string };
+type PreparedRow = { address: `0x${string}`; amount: bigint };
 
 const text = {
   en: {
-    title: 'Bulk Sender', subtitle: 'One public message and different USDC amounts in one atomic batch.', recipient: 'Recipient address', amount: 'USDC amount',
-    add: 'Add recipient', paste: 'Paste address,amount rows', pasteHint: 'One row per line: 0xAddress,12.50', apply: 'Apply rows', message: 'Public batch message',
-    approve: 'Approve ArcanumBulk', approving: 'Approving...', send: 'Send atomic batch', wallet: 'Waiting for wallet confirmation...', confirmed: 'Transaction confirmed.',
-    total: 'Total transfer', fee: 'Platform fee', balance: 'USDC balance', allowance: 'Allowance', rows: 'Recipients', public: 'Public and permanent on-chain message.',
-    atomic: 'Atomic protection: if one recipient fails, every transfer and the fee revert.', sent: 'Sent batches', received: 'Received batches', empty: 'No batch history yet.',
-    invalid: 'Check recipient addresses, duplicates, and amounts with at most 6 decimals.', messageRequired: 'A public message is required and must be at most 4,096 bytes.',
-    unavailable: 'Bulk contract is not configured yet.', disconnected: 'Connect your wallet and switch to Arc Testnet.', insufficient: 'Insufficient USDC balance for this batch.',
+    eyebrow: 'USDC batch', title: 'Bulk Sender', body: 'Send Arc native USDC to up to 100 recipients in one atomic transaction.',
+    notConfigured: 'Bulk contract is not configured yet.', noWallet: 'Connect your wallet to prepare a batch.', wrongChain: 'Switch to Arc Testnet to send native USDC.',
+    recipient: 'Recipient', amount: 'USDC amount', add: 'Add recipient', import: 'Import CSV', paste: 'Paste address,amount rows',
+    apply: 'Apply rows', total: 'Batch total', balance: 'Wallet balance', recipients: 'Recipients', review: 'Review batch',
+    reviewTitle: 'Confirm atomic batch', atomic: 'If one recipient rejects the transfer, the complete transaction is reverted.',
+    gas: 'Estimated gas', confirm: 'Continue in wallet', cancel: 'Cancel', pending: 'Transaction pending…', confirmed: 'Batch confirmed.',
+    failed: 'Batch failed', invalid: 'Fix invalid addresses or amounts before continuing.', insufficient: 'Wallet balance is lower than batch total plus estimated gas.',
+    duplicate: 'Duplicate addresses were merged into one recipient total.', tooMany: 'A batch can contain at most 100 recipient rows.', explorer: 'Explorer', clear: 'Clear', close: 'Close',
   },
   tr: {
-    title: 'Bulk Sender', subtitle: 'Tek atomik batch içinde ortak public mesaj ve farklı USDC tutarları.', recipient: 'Alıcı adresi', amount: 'USDC tutarı',
-    add: 'Alıcı ekle', paste: 'address,amount satırlarını yapıştır', pasteHint: 'Her satır: 0xAdres,12.50', apply: 'Satırları uygula', message: 'Public batch mesajı',
-    approve: 'ArcanumBulk approve et', approving: 'Approve ediliyor...', send: 'Atomik batch gönder', wallet: 'Cüzdan onayı bekleniyor...', confirmed: 'İşlem onaylandı.',
-    total: 'Toplam transfer', fee: 'Platform ücreti', balance: 'USDC bakiye', allowance: 'Allowance', rows: 'Alıcılar', public: 'Mesaj public ve on-chain kalıcıdır.',
-    atomic: 'Atomik koruma: tek alıcı başarısızsa tüm transferler ve ücret geri alınır.', sent: 'Gönderilen batchler', received: 'Alınan batchler', empty: 'Henüz batch geçmişi yok.',
-    invalid: 'Adresleri, tekrar eden alıcıları ve en fazla 6 ondalıklı tutarları kontrol et.', messageRequired: 'Public mesaj zorunludur ve en fazla 4.096 byte olabilir.',
-    unavailable: 'Bulk kontratı henüz yapılandırılmadı.', disconnected: 'Cüzdanını bağla ve Arc Testnet ağına geç.', insufficient: 'Bu batch için USDC bakiye yetersiz.',
+    eyebrow: 'USDC batch', title: 'Toplu Gönderici', body: 'Arc native USDC’yi en fazla 100 alıcıya tek ve atomik işlemle gönderin.',
+    notConfigured: 'Bulk contract adresi henüz yapılandırılmadı.', noWallet: 'Batch hazırlamak için cüzdanınızı bağlayın.', wrongChain: 'Native USDC göndermek için Arc Testnet ağına geçin.',
+    recipient: 'Alıcı', amount: 'USDC tutarı', add: 'Alıcı ekle', import: 'CSV içe aktar', paste: 'address,amount satırlarını yapıştırın',
+    apply: 'Satırları uygula', total: 'Batch toplamı', balance: 'Cüzdan bakiyesi', recipients: 'Alıcılar', review: 'Batch’i incele',
+    reviewTitle: 'Atomik batch’i onayla', atomic: 'Bir alıcı transferi reddederse işlemin tamamı geri alınır.',
+    gas: 'Tahmini gas', confirm: 'Cüzdanda devam et', cancel: 'İptal', pending: 'İşlem bekliyor…', confirmed: 'Batch onaylandı.',
+    failed: 'Batch başarısız', invalid: 'Devam etmeden önce geçersiz adres veya tutarları düzeltin.', insufficient: 'Cüzdan bakiyesi batch toplamı ve tahmini gas için yetersiz.',
+    duplicate: 'Tekrarlanan adresler tek alıcı toplamında birleştirildi.', tooMany: 'Bir batch en fazla 100 alıcı satırı içerebilir.', explorer: 'Explorer', clear: 'Temizle', close: 'Kapat',
   },
 } as const;
 
-type DraftRow = BulkDraftRow & { id: string };
-type HistoryTab = 'sent' | 'received';
-
-function createRow(id = `row-${Date.now()}-${Math.random()}`): DraftRow {
-  return { id, recipient: '', amount: '' };
+let rowSequence = 1;
+function newRow(address = '', amount = ''): Row {
+  return { id: rowSequence++, address, amount };
 }
 
-function short(address: string) {
-  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+function parseRows(value: string) {
+  return value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => {
+    const [address = '', amount = ''] = line.split(/[,;\t ]+/);
+    return newRow(address.trim(), amount.trim());
+  });
 }
 
-function readableError(error: unknown) {
-  const value = error instanceof Error ? error.message : String(error ?? '');
-  const match = value.match(/reverted with reason string '([^']+)'/);
-  return match?.[1] ?? value;
+function prepareRows(rows: Row[]) {
+  const merged = new Map<string, PreparedRow>();
+  let invalid = false;
+  let duplicate = false;
+
+  rows.filter((row) => row.address.trim() || row.amount.trim()).forEach((row) => {
+    if (!isAddress(row.address.trim())) {
+      invalid = true;
+      return;
+    }
+    try {
+      const amount = parseEther(row.amount.trim());
+      if (amount <= 0n) throw new Error('AMOUNT_REQUIRED');
+      const key = row.address.toLowerCase();
+      const existing = merged.get(key);
+      if (existing) {
+        existing.amount += amount;
+        duplicate = true;
+      } else {
+        merged.set(key, { address: row.address.trim() as `0x${string}`, amount });
+      }
+    } catch {
+      invalid = true;
+    }
+  });
+
+  const prepared = [...merged.values()];
+  const total = prepared.reduce((sum, row) => sum + row.amount, 0n);
+  return { prepared, total, invalid: invalid || prepared.length === 0 || prepared.length > 100, duplicate };
 }
 
-export function BulkSender({ language }: { language: Language }) {
+function usdc(value: bigint, digits = 6) {
+  const formatted = Number(formatEther(value));
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits: digits }).format(formatted);
+}
+
+export default function BulkSender({ language }: { language: Language }) {
   const copy = text[language];
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
-  const publicClient = usePublicClient();
-  const { writeContractAsync } = useWriteContract();
-  const connectedAddress = address ?? zeroAddress;
-  const enabled = isConnected && chainId === arcNetworkTestnet.id && isArcanumBulkConfigured;
-
-  const [rows, setRows] = useState<DraftRow[]>([createRow('row-initial')]);
-  const [pasteValue, setPasteValue] = useState('');
-  const [message, setMessage] = useState('');
-  const [historyTab, setHistoryTab] = useState<HistoryTab>('sent');
-  const [pendingAction, setPendingAction] = useState<'approve' | 'send' | ''>('');
-  const [status, setStatus] = useState('');
+  const isCorrectChain = chainId === arcNetworkTestnet.id;
+  const balance = useBalance({ address, chainId: arcNetworkTestnet.id, query: { enabled: Boolean(address) } });
+  const publicClient = usePublicClient({ chainId: arcNetworkTestnet.id });
+  const { writeContractAsync, isPending: walletPending } = useWriteContract();
+  const [hash, setHash] = useState<`0x${string}` | undefined>();
+  const receipt = useWaitForTransactionReceipt({ hash, chainId: arcNetworkTestnet.id });
+  const [rows, setRows] = useState<Row[]>([newRow(), newRow()]);
+  const [paste, setPaste] = useState('');
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [estimate, setEstimate] = useState<bigint | null>(null);
   const [error, setError] = useState('');
-  const [lastHash, setLastHash] = useState<Hex>();
+  const [status, setStatus] = useState('');
+  const prepared = useMemo(() => prepareRows(rows), [rows]);
+  const hasInput = rows.some((row) => row.address.trim() || row.amount.trim());
 
-  const balanceRead = useReadContract({
-    address: arcUsdcAddress,
-    abi: arcUsdcAbi,
-    functionName: 'balanceOf',
-    args: [connectedAddress],
-    query: { enabled },
-  });
-  const allowanceRead = useReadContract({
-    address: arcUsdcAddress,
-    abi: arcUsdcAbi,
-    functionName: 'allowance',
-    args: [connectedAddress, arcanumBulkAddress],
-    query: { enabled },
-  });
-  const sentIdsRead = useReadContract({
-    address: arcanumBulkAddress,
-    abi: arcanumBulkAbi,
-    functionName: 'getSentBatchIdsPage',
-    args: [connectedAddress, 0n, 100n],
-    query: { enabled },
-  });
-  const receivedIdsRead = useReadContract({
-    address: arcanumBulkAddress,
-    abi: arcanumBulkAbi,
-    functionName: 'getReceivedBatchIdsPage',
-    args: [connectedAddress, 0n, 100n],
-    query: { enabled },
-  });
-
-  const balance = (balanceRead.data ?? 0n) as bigint;
-  const allowance = (allowanceRead.data ?? 0n) as bigint;
-  const sentIds = (sentIdsRead.data ?? []) as readonly bigint[];
-  const receivedIds = (receivedIdsRead.data ?? []) as readonly bigint[];
-  const historyIds = historyTab === 'sent' ? sentIds : receivedIds;
-  const historyReads = useReadContracts({
-    contracts: historyIds.map((batchId) => ({
-      address: arcanumBulkAddress,
-      abi: arcanumBulkAbi,
-      functionName: 'getBatch',
-      args: [batchId],
-    } as const)),
-    query: { enabled: enabled && historyIds.length > 0 },
-  });
-  const batches = useMemo(() => historyIds.flatMap((batchId, index): BulkBatch[] => {
-    const batch = historyReads.data?.[index]?.result as BulkBatch | undefined;
-    return batch ? [batch] : [];
-  }).sort((left, right) => Number(right.id - left.id)), [historyIds, historyReads.data]);
-
-  const prepared = useMemo(() => {
-    try {
-      return { value: prepareBulkRows(rows, address, maxBulkRecipients), error: '' };
-    } catch (caught) {
-      return { value: null, error: readableError(caught) };
+  useEffect(() => {
+    if (receipt.isSuccess) {
+      setStatus(copy.confirmed);
+      setReviewOpen(false);
+      setRows([newRow(), newRow()]);
+      setPaste('');
     }
-  }, [address, rows]);
-  const messageBytes = new TextEncoder().encode(message.trim()).length;
-  const messageValid = messageBytes > 0 && messageBytes <= 4096;
-  const hasBalance = Boolean(prepared.value && balance >= prepared.value.totalAmount);
-  const needsApproval = Boolean(prepared.value && allowance < prepared.value.totalAmount);
+  }, [copy.confirmed, receipt.isSuccess]);
 
-  async function refresh() {
-    await Promise.all([
-      balanceRead.refetch(), allowanceRead.refetch(), sentIdsRead.refetch(), receivedIdsRead.refetch(), historyReads.refetch(),
-    ]);
+  function updateRow(id: number, key: 'address' | 'amount', value: string) {
+    setRows((current) => current.map((row) => row.id === id ? { ...row, [key]: value } : row));
   }
 
-  async function execute(kind: 'approve' | 'send', action: () => Promise<Hex>, after?: () => void) {
-    if (!publicClient) return;
-    setPendingAction(kind);
-    setStatus(copy.wallet);
+  function applyImported(value = paste) {
+    const imported = parseRows(value);
+    if (imported.length > 100) {
+      setError(copy.tooMany);
+      return;
+    }
+    if (imported.length) {
+      setError('');
+      setRows(imported);
+    }
+  }
+
+  async function importFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const value = await file.text();
+    setPaste(value);
+    applyImported(value);
+    event.target.value = '';
+  }
+
+  async function openReview(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError('');
+    setEstimate(null);
+    if (prepared.invalid) {
+      setError(copy.invalid);
+      return;
+    }
+    if (!address || !publicClient) return;
+
+    try {
+      const gas = await publicClient.estimateContractGas({
+        account: address,
+        address: arcanumBulkSenderAddress,
+        abi: arcanumBulkSenderAbi,
+        functionName: 'batchSend',
+        args: [prepared.prepared.map((row) => row.address), prepared.prepared.map((row) => row.amount)],
+        value: prepared.total,
+      });
+      const gasPrice = await publicClient.getGasPrice();
+      const gasCost = gas * gasPrice;
+      setEstimate(gasCost);
+      if ((balance.data?.value ?? 0n) < prepared.total + gasCost) {
+        setError(copy.insufficient);
+        return;
+      }
+      setReviewOpen(true);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : copy.failed);
+    }
+  }
+
+  async function confirmBatch() {
     setError('');
     try {
-      const hash = await action();
-      setLastHash(hash);
-      await publicClient.waitForTransactionReceipt({ hash });
-      setStatus(copy.confirmed);
-      after?.();
-      await refresh();
-    } catch (caught) {
-      setStatus('');
-      setError(readableError(caught));
-    } finally {
-      setPendingAction('');
+      const nextHash = await writeContractAsync({
+        address: arcanumBulkSenderAddress,
+        abi: arcanumBulkSenderAbi,
+        functionName: 'batchSend',
+        args: [prepared.prepared.map((row) => row.address), prepared.prepared.map((row) => row.amount)],
+        value: prepared.total,
+        chainId: arcNetworkTestnet.id,
+      });
+      setHash(nextHash);
+      setStatus(copy.pending);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : copy.failed);
     }
   }
 
-  function updateRow(id: string, field: 'recipient' | 'amount', value: string) {
-    setRows((current) => current.map((row) => row.id === id ? { ...row, [field]: value } : row));
-  }
-
-  function applyPaste() {
-    try {
-      const parsed = parseBulkPaste(pasteValue);
-      if (parsed.length > maxBulkRecipients) throw new Error('BULK_TOO_MANY_RECIPIENTS');
-      setRows(parsed.map((row, index) => ({ ...row, id: `paste-${index}-${row.recipient.toLowerCase()}` })));
-      setPasteValue('');
-      setError('');
-    } catch (caught) {
-      setError(readableError(caught));
-    }
-  }
-
-  function approve() {
-    void execute('approve', () => writeContractAsync({
-      address: arcUsdcAddress,
-      abi: arcUsdcAbi,
-      functionName: 'approve',
-      args: [arcanumBulkAddress, maxUint256],
-    }));
-  }
-
-  function submitBatch(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!prepared.value || !messageValid || needsApproval || !hasBalance) return;
-    const payload = prepared.value;
-    void execute('send', () => writeContractAsync({
-      address: arcanumBulkAddress,
-      abi: arcanumBulkAbi,
-      functionName: 'bulkSend',
-      args: [payload.recipients, payload.amounts, message.trim()],
-      value: bulkBatchFee,
-    }), () => {
-      setRows([createRow()]);
-      setMessage('');
-    });
-  }
-
-  if (!isArcanumBulkConfigured) return <Notice title={copy.title} body={copy.unavailable} />;
-  if (!enabled) return <Notice title={copy.title} body={copy.disconnected} />;
+  const unavailable = !isConnected ? copy.noWallet : !isCorrectChain ? copy.wrongChain : !isArcanumBulkSenderConfigured ? copy.notConfigured : '';
 
   return (
-    <section className="grid min-w-0 gap-4 2xl:grid-cols-[minmax(0,1fr)_380px]">
-      <form onSubmit={submitBatch} className="panel min-w-0">
-        <div className="panel-header">
-          <div><p className="eyebrow">USDC Batch</p><h2 className="panel-title">{copy.title}</h2><p className="mt-2 text-sm text-zinc-500">{copy.subtitle}</p></div>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-300/25 bg-sky-300/10 px-2.5 py-1 text-xs text-sky-200"><ShieldCheck size={13} />Atomic</span>
-        </div>
+    <section className="panel min-h-[640px]">
+      <div className="panel-header">
+        <div><p className="eyebrow">{copy.eyebrow}</p><h2 className="panel-title">{copy.title}</h2><p className="mt-2 text-sm text-zinc-500">{copy.body}</p></div>
+        <div className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-right"><p className="text-[11px] text-zinc-500">{copy.balance}</p><p className="mt-1 font-mono text-sm text-zinc-200">{usdc(balance.data?.value ?? 0n)} USDC</p></div>
+      </div>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Metric label={copy.balance} value={`${formatUnits(balance, 6)} USDC`} />
-          <Metric label={copy.allowance} value={allowance === maxUint256 ? 'Unlimited' : `${formatUnits(allowance, 6)} USDC`} />
-          <Metric label={copy.total} value={`${formatUnits(prepared.value?.totalAmount ?? 0n, 6)} USDC`} />
-          <Metric label={copy.fee} value={bulkBatchFeeLabel} />
+      {unavailable ? <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm text-zinc-500">{unavailable}</div> : null}
+      {error ? <div className="helper-danger mt-4">{error}</div> : null}
+      {status ? (
+        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-sky-300/20 bg-sky-300/10 px-3 py-2 text-sm text-sky-100">
+          {receipt.isLoading || walletPending ? <Loader2 size={15} className="animate-spin" /> : receipt.isSuccess ? <CheckCircle2 size={15} /> : <WalletCards size={15} />}
+          <span>{status}</span>
+          {hash ? <a href={transactionUrl(hash)} target="_blank" rel="noreferrer" className="ml-auto inline-flex items-center gap-1 text-xs underline">{copy.explorer}<ExternalLink size={12} /></a> : null}
         </div>
+      ) : null}
 
-        <div className="mt-5 rounded-lg border border-zinc-800 bg-black/20 p-3">
-          <div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold text-zinc-200">{copy.rows} ({rows.length}/{maxBulkRecipients})</p><Users size={16} className="text-zinc-500" /></div>
-          <div className="mt-3 grid gap-2">
+      <form onSubmit={openReview} className="mt-5 grid gap-5">
+        <div className="rounded-xl border border-zinc-800 bg-black/20 p-3 sm:p-4">
+          <div className="grid gap-3">
             {rows.map((row, index) => (
-              <div key={row.id} className="grid gap-2 sm:grid-cols-[36px_minmax(0,1fr)_160px_40px] sm:items-center">
-                <span className="hidden text-center text-xs text-zinc-600 sm:block">{index + 1}</span>
-                <input value={row.recipient} onChange={(event) => updateRow(row.id, 'recipient', event.target.value)} className="input font-mono text-xs" placeholder={copy.recipient} />
-                <input value={row.amount} onChange={(event) => updateRow(row.id, 'amount', event.target.value)} className="input" placeholder={copy.amount} inputMode="decimal" />
-                <button type="button" onClick={() => setRows((current) => current.filter((item) => item.id !== row.id))} disabled={rows.length === 1} className="btn-ghost h-10 w-10" aria-label="Remove row"><Trash2 size={15} /></button>
+              <div key={row.id} className="grid gap-2 sm:grid-cols-[32px_minmax(0,1fr)_180px_40px] sm:items-center">
+                <span className="hidden text-center font-mono text-xs text-zinc-600 sm:block">{index + 1}</span>
+                <input value={row.address} onChange={(event) => updateRow(row.id, 'address', event.target.value)} placeholder={`${copy.recipient} 0x…`} className="input font-mono text-xs" />
+                <input value={row.amount} onChange={(event) => updateRow(row.id, 'amount', event.target.value)} inputMode="decimal" placeholder={copy.amount} className="input" />
+                <button type="button" onClick={() => setRows((current) => current.length === 1 ? current : current.filter((item) => item.id !== row.id))} className="btn-ghost h-10 w-10" aria-label="Remove recipient"><Trash2 size={15} /></button>
               </div>
             ))}
           </div>
-          <button type="button" onClick={() => setRows((current) => current.length < maxBulkRecipients ? [...current, createRow()] : current)} className="btn-ghost mt-3 h-9 px-3"><Plus size={14} />{copy.add}</button>
-        </div>
-
-        <details className="mt-3 rounded-lg border border-zinc-800 bg-zinc-950 p-3">
-          <summary className="cursor-pointer text-sm font-medium text-zinc-300"><ClipboardPaste size={15} className="mr-2 inline" />{copy.paste}</summary>
-          <textarea value={pasteValue} onChange={(event) => setPasteValue(event.target.value)} className="input mt-3 min-h-28 resize-y py-3 font-mono text-xs" placeholder={copy.pasteHint} />
-          <button type="button" onClick={applyPaste} disabled={!pasteValue.trim()} className="btn-ghost mt-2 h-9 px-3">{copy.apply}</button>
-        </details>
-
-        <label className="mt-4 grid gap-2">
-          <span className="text-xs font-medium text-zinc-500">{copy.message}</span>
-          <textarea value={message} onChange={(event) => setMessage(event.target.value)} className="input min-h-28 resize-y py-3" placeholder={copy.message} />
-          <span className="flex justify-between gap-3 text-xs text-zinc-500"><span>{copy.public}</span><span>{messageBytes}/4096 bytes</span></span>
-        </label>
-
-        {prepared.error ? <p className="helper-warning mt-3">{copy.invalid} <span className="font-mono text-xs">({prepared.error})</span></p> : null}
-        {!messageValid ? <p className="helper-warning mt-3">{copy.messageRequired}</p> : null}
-        {prepared.value && !hasBalance ? <p className="helper-danger mt-3">{copy.insufficient}</p> : null}
-        <p className="mt-3 rounded-md border border-sky-300/20 bg-sky-300/10 px-3 py-2 text-sm text-sky-100">{copy.atomic}</p>
-
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
-          {needsApproval ? (
-            <button type="button" onClick={approve} disabled={!prepared.value || Boolean(pendingAction)} className="btn-ghost h-11 px-5"><Coins size={17} />{pendingAction === 'approve' ? copy.approving : copy.approve}</button>
-          ) : null}
-          <button type="submit" disabled={!prepared.value || !messageValid || needsApproval || !hasBalance || Boolean(pendingAction)} className="btn-primary h-11 px-5"><Send size={17} />{copy.send}</button>
-        </div>
-
-        {(status || error || lastHash) ? (
-          <div className={`mt-4 rounded-lg border px-4 py-3 text-sm ${error ? 'border-red-400/30 bg-red-400/10 text-red-200' : 'border-emerald-400/30 bg-emerald-400/10 text-emerald-100'}`}>
-            <p className="break-words">{error || status}</p>
-            {lastHash ? <a href={transactionUrl(lastHash)} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs text-sky-200 underline">ArcScan <ExternalLink size={12} /></a> : null}
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button type="button" onClick={() => setRows((current) => current.length >= 100 ? current : [...current, newRow()])} disabled={rows.length >= 100} className="btn-ghost h-10 px-3"><Plus size={15} />{copy.add}</button>
+            <label className="btn-ghost h-10 cursor-pointer px-3"><FileUp size={15} />{copy.import}<input type="file" accept=".csv,text/csv,text/plain" className="hidden" onChange={(event) => void importFile(event)} /></label>
+            <button type="button" onClick={() => { setRows([newRow(), newRow()]); setPaste(''); setError(''); }} className="btn-subtle h-10 px-3">{copy.clear}</button>
           </div>
-        ) : null}
+        </div>
+
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="rounded-xl border border-zinc-800 bg-black/20 p-4">
+            <label className="grid gap-2"><span className="text-xs font-medium text-zinc-400">{copy.paste}</span><textarea value={paste} onChange={(event) => setPaste(event.target.value)} className="input min-h-28 resize-y py-3 font-mono text-xs" placeholder="0x123…,1.5\n0x456…,2" /></label>
+            <button type="button" onClick={() => applyImported()} disabled={!paste.trim()} className="btn-ghost mt-3 h-10 px-3">{copy.apply}</button>
+          </div>
+          <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+            <Metric label={copy.recipients} value={`${prepared.prepared.length}/100`} />
+            <Metric label={copy.total} value={`${usdc(prepared.total)} USDC`} />
+            {prepared.invalid && hasInput ? <p className="mt-3 text-xs leading-5 text-red-200">{copy.invalid}</p> : null}
+            {prepared.duplicate ? <p className="mt-3 text-xs leading-5 text-amber-200">{copy.duplicate}</p> : null}
+            <button type="submit" disabled={Boolean(unavailable) || prepared.invalid || walletPending || receipt.isLoading} className="btn-primary mt-4 h-11 w-full px-4"><Send size={16} />{copy.review}</button>
+          </div>
+        </div>
       </form>
 
-      <aside className="panel min-w-0">
-        <div className="panel-header">
-          <div><p className="eyebrow">History</p><h2 className="panel-title">Batch history</h2></div>
-          <button type="button" onClick={() => void refresh()} className="btn-ghost h-10 w-10" aria-label="Refresh"><RefreshCw size={16} /></button>
+      {reviewOpen ? (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label={copy.reviewTitle}>
+          <div className="modal-panel">
+            <div className="flex items-start justify-between gap-3"><div><p className="eyebrow">{copy.eyebrow}</p><h3 className="mt-2 text-xl font-semibold text-white">{copy.reviewTitle}</h3></div><button type="button" onClick={() => setReviewOpen(false)} className="btn-ghost h-9 w-9" aria-label={copy.close}><X size={16} /></button></div>
+            <div className="mt-5 grid gap-3 rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+              <Metric label={copy.recipients} value={String(prepared.prepared.length)} />
+              <Metric label={copy.total} value={`${usdc(prepared.total)} USDC`} />
+              <Metric label={copy.gas} value={estimate === null ? '—' : `≈ ${usdc(estimate, 8)} USDC`} />
+            </div>
+            <p className="mt-4 helper-warning">{copy.atomic}</p>
+            {error ? <div className="helper-danger mt-3">{error}</div> : null}
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><button type="button" onClick={() => setReviewOpen(false)} disabled={walletPending || receipt.isLoading} className="btn-ghost h-10 px-4">{copy.cancel}</button><button type="button" onClick={() => void confirmBatch()} disabled={walletPending || receipt.isLoading} className="btn-primary h-10 px-4">{walletPending || receipt.isLoading ? <Loader2 size={15} className="animate-spin" /> : <WalletCards size={15} />}{copy.confirm}</button></div>
+          </div>
         </div>
-        <div className="mt-4 grid grid-cols-2 rounded-lg border border-zinc-800 bg-zinc-950 p-1">
-          <button type="button" onClick={() => setHistoryTab('sent')} className={`h-10 rounded-md text-sm ${historyTab === 'sent' ? 'bg-white text-zinc-950' : 'text-zinc-400'}`}>{copy.sent}</button>
-          <button type="button" onClick={() => setHistoryTab('received')} className={`h-10 rounded-md text-sm ${historyTab === 'received' ? 'bg-white text-zinc-950' : 'text-zinc-400'}`}>{copy.received}</button>
-        </div>
-        <div className="mt-4 grid gap-3">
-          {batches.length === 0 ? <p className="text-sm text-zinc-500">{copy.empty}</p> : null}
-          {batches.map((batch) => (
-            <article key={batch.id.toString()} className="chat-card p-4">
-              <div className="flex items-center justify-between gap-2"><span className="inline-flex items-center gap-1.5 text-xs text-emerald-200"><CheckCircle2 size={14} />Batch #{batch.id.toString()}</span><span className="text-xs text-zinc-500">{batch.recipientCount.toString()} recipients</span></div>
-              <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-zinc-200">{batch.message}</p>
-              <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-zinc-500">
-                <span>{formatUnits(batch.totalAmount, 6)} USDC</span><span className="text-right">{short(batch.sender)}</span>
-                <span className="col-span-2">{new Date(Number(batch.timestamp) * 1000).toLocaleString(language === 'tr' ? 'tr-TR' : 'en-US')}</span>
-              </div>
-            </article>
-          ))}
-        </div>
-      </aside>
+      ) : null}
     </section>
   );
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2"><p className="text-[11px] text-zinc-500">{label}</p><p className="mt-1 truncate font-mono text-xs text-zinc-200">{value}</p></div>;
-}
-
-function Notice({ title, body }: { title: string; body: string }) {
-  return <section className="panel min-h-[560px]"><p className="eyebrow">USDC Batch</p><h2 className="panel-title">{title}</h2><p className="mt-4 text-sm text-zinc-500">{body}</p><History size={18} className="mt-5 text-zinc-700" /></section>;
+  return <div className="flex items-center justify-between gap-4 border-b border-zinc-800 py-2 last:border-0"><span className="text-xs text-zinc-500">{label}</span><span className="font-mono text-sm text-zinc-200">{value}</span></div>;
 }

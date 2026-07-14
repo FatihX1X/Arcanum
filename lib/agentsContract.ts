@@ -1,11 +1,13 @@
 import { parseEther } from 'viem';
 
+import { arcTestnetDeployments, zeroAddress } from './deployments';
+
 export const arcanumAgentsAddress = (
-  process.env.NEXT_PUBLIC_AGENT_CONTRACT_ADDRESS || '0x357096A24F914A178F04B7175837a2f969C42eCA'
+  process.env.NEXT_PUBLIC_AGENT_CONTRACT_ADDRESS || arcTestnetDeployments.agents.address
 ) as `0x${string}`;
 
 export const isArcanumAgentsConfigured =
-  arcanumAgentsAddress !== '0x0000000000000000000000000000000000000000';
+  arcanumAgentsAddress !== zeroAddress;
 
 export const publicAgentMessageFee = parseEther('0.01');
 export const privateAgentMessageFee = parseEther('0.05');
