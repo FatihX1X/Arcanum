@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { CreditCard, KeyRound, Lock, Plus, RefreshCw, Search, Send, Shield, UserPlus } from 'lucide-react';
 import { formatEther, isAddress, parseEther, zeroAddress } from 'viem';
 import { useAccount, useChainId, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
@@ -305,6 +305,13 @@ export default function AgentMessages({ language }: { language: Language }) {
   const activeMessages = activeConversation?.messages ?? [];
   const txUrl = transactionUrl(pendingHash ?? '');
 
+  const refreshMessages = useCallback(async () => {
+    if (!isConnected || !isCorrectChain || !ownRegistered) {
+      return;
+    }
+    await Promise.all([refetchOwnAgent(), refetchOwnKey(), refetchInbox(), refetchSent()]);
+  }, [isConnected, isCorrectChain, ownRegistered, refetchInbox, refetchOwnAgent, refetchOwnKey, refetchSent]);
+
   useEffect(() => {
     if (!address) {
       setLocalKeyReady(false);
@@ -328,7 +335,7 @@ export default function AgentMessages({ language }: { language: Language }) {
       setRecipientInput('');
     }
     void refreshMessages();
-  }, [activeRecipient, copy.success, receipt.isSuccess, recipientValid]);
+  }, [activeRecipient, copy.success, receipt.isSuccess, recipientValid, refreshMessages]);
 
   useEffect(() => {
     if (!receipt.isError || !receipt.error) {
@@ -337,13 +344,6 @@ export default function AgentMessages({ language }: { language: Language }) {
     setStatus(copy.failed);
     setError(readableError(receipt.error, copy.failed));
   }, [copy.failed, receipt.error, receipt.isError]);
-
-  async function refreshMessages() {
-    if (!isConnected || !isCorrectChain || !ownRegistered) {
-      return;
-    }
-    await Promise.all([refetchOwnAgent(), refetchOwnKey(), refetchInbox(), refetchSent()]);
-  }
 
   async function registerAgent(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -760,7 +760,7 @@ function Empty({ title, body }: { title: string; body: string }) {
   );
 }
 
-function Tab({ active, icon, label, onClick }: { active: boolean; icon: JSX.Element; label: string; onClick: () => void }) {
+function Tab({ active, icon, label, onClick }: { active: boolean; icon: ReactNode; label: string; onClick: () => void }) {
   return (
     <button type="button" onClick={onClick} className={`inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium transition ${active ? 'bg-white text-zinc-950' : 'text-zinc-400 hover:bg-zinc-800'}`}>
       {icon}

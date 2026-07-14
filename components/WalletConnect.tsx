@@ -1,9 +1,12 @@
 'use client';
 
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   AlertTriangle,
   Archive,
+  BookOpen,
   Bot,
   CheckCircle2,
   Clock3,
@@ -15,6 +18,7 @@ import {
   Inbox,
   Info,
   KeyRound,
+  Layers3,
   Languages,
   Lock,
   Menu,
@@ -25,6 +29,7 @@ import {
   Send,
   Shield,
   Upload,
+  UsersRound,
   Wallet,
   Wifi,
   X,
@@ -62,10 +67,12 @@ import {
   unlockEncryptionKey,
 } from '../lib/crypto';
 import AgentMessages from './AgentMessages';
+import { BulkSender } from './BulkSender';
+import { GroupChat } from './GroupChat';
 import { copy, type Language } from './arcanumCopy';
 
 type PrivacyMode = 'private' | 'public';
-type AppView = 'dm' | 'agents' | 'history' | 'about' | 'faq';
+type AppView = 'dm' | 'groups' | 'bulk' | 'agents' | 'history' | 'about' | 'faq';
 type HistoryTab = 'inbox' | 'sent';
 type KeyModalMode = 'unlock' | 'register' | 'export' | 'import' | null;
 type TransactionStep = 'idle' | 'preparing' | 'wallet' | 'pending' | 'success' | 'error';
@@ -256,61 +263,7 @@ export default function WalletConnect() {
   const visibleHistory = historySource.slice(0, historyVisible);
   const errors = [flowError, connectError?.message, switchError?.message, writeError?.message, receipt.error?.message].filter(Boolean) as string[];
 
-  useEffect(() => {
-    const stored = localStorage.getItem('arcanum.language');
-    if (stored === 'en' || stored === 'tr') {
-      setLanguageState(stored);
-    }
-  }, []);
-
-  useEffect(() => {
-    refreshLocalKeyStatus();
-  }, [address]);
-
-  useEffect(() => {
-    if (!isConnected || !address || isCorrectChain || autoSwitchedFor === address) {
-      return;
-    }
-
-    setAutoSwitchedFor(address);
-    void switchToArc();
-  }, [address, autoSwitchedFor, isConnected, isCorrectChain]);
-
-  useEffect(() => {
-    if (!receipt.isSuccess) {
-      return;
-    }
-
-    setStatus(t.status.success);
-    setTxStep('success');
-    setMessage('');
-    setPendingHash(undefined);
-    if (pendingRecipient) {
-      setSelected(pendingRecipient);
-      setNewRecipient('');
-      setPendingRecipient('');
-    }
-    void refetchInbox();
-    void refetchSent();
-    void refetchOwnKey();
-  }, [pendingRecipient, receipt.isSuccess, refetchInbox, refetchOwnKey, refetchSent, t.status.success]);
-
-  useEffect(() => {
-    if (!receipt.isError || !receipt.error) {
-      return;
-    }
-
-    setTxStep('error');
-    setStatus(t.status.failed);
-    setFlowError(readableError(receipt.error, t));
-  }, [receipt.error, receipt.isError, t]);
-
-  function setLanguage(next: Language) {
-    setLanguageState(next);
-    localStorage.setItem('arcanum.language', next);
-  }
-
-  function refreshLocalKeyStatus() {
+  const refreshLocalKeyStatus = useCallback(() => {
     if (!address) {
       setLocalKeyStored(false);
       setLocalKeyUnlocked(false);
@@ -319,38 +272,9 @@ export default function WalletConnect() {
 
     setLocalKeyStored(hasStoredEncryptionKey(address));
     setLocalKeyUnlocked(isEncryptionKeyUnlocked(address));
-  }
+  }, [address]);
 
-  function chooseView(next: AppView) {
-    setView(next);
-    setMenuOpen(false);
-  }
-
-  function replyTo(addressToOpen: `0x${string}`) {
-    setSelected(addressToOpen);
-    setNewRecipient('');
-    setView('dm');
-    setMenuOpen(false);
-  }
-
-  function openKeyModal(mode: Exclude<KeyModalMode, null>) {
-    setKeyModalMode(mode);
-    setKeyModalPassphrase('');
-    setKeyModalFile(null);
-    setFlowError('');
-  }
-
-  function closeKeyModal() {
-    if (keyActionPending) {
-      return;
-    }
-
-    setKeyModalMode(null);
-    setKeyModalPassphrase('');
-    setKeyModalFile(null);
-  }
-
-  async function switchToArc() {
+  const switchToArc = useCallback(async () => {
     setFlowError('');
     const params = arcAddEthereumChainParams();
     const provider = (window as Window & { ethereum?: EthereumProvider }).ethereum;
@@ -390,6 +314,89 @@ export default function WalletConnect() {
         setFlowError(readableError(error, t) || t.status.switchRejected);
       }
     }
+  }, [switchChainAsync, t]);
+
+  useEffect(() => {
+    const stored = localStorage.getItem('arcanum.language');
+    if (stored === 'en' || stored === 'tr') {
+      setLanguageState(stored);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshLocalKeyStatus();
+  }, [refreshLocalKeyStatus]);
+
+  useEffect(() => {
+    if (!isConnected || !address || isCorrectChain || autoSwitchedFor === address) {
+      return;
+    }
+
+    setAutoSwitchedFor(address);
+    void switchToArc();
+  }, [address, autoSwitchedFor, isConnected, isCorrectChain, switchToArc]);
+
+  useEffect(() => {
+    if (!receipt.isSuccess) {
+      return;
+    }
+
+    setStatus(t.status.success);
+    setTxStep('success');
+    setMessage('');
+    setPendingHash(undefined);
+    if (pendingRecipient) {
+      setSelected(pendingRecipient);
+      setNewRecipient('');
+      setPendingRecipient('');
+    }
+    void refetchInbox();
+    void refetchSent();
+    void refetchOwnKey();
+  }, [pendingRecipient, receipt.isSuccess, refetchInbox, refetchOwnKey, refetchSent, t.status.success]);
+
+  useEffect(() => {
+    if (!receipt.isError || !receipt.error) {
+      return;
+    }
+
+    setTxStep('error');
+    setStatus(t.status.failed);
+    setFlowError(readableError(receipt.error, t));
+  }, [receipt.error, receipt.isError, t]);
+
+  function setLanguage(next: Language) {
+    setLanguageState(next);
+    localStorage.setItem('arcanum.language', next);
+  }
+
+  function chooseView(next: AppView) {
+    setView(next);
+    setMenuOpen(false);
+  }
+
+  function replyTo(addressToOpen: `0x${string}`) {
+    setSelected(addressToOpen);
+    setNewRecipient('');
+    setView('dm');
+    setMenuOpen(false);
+  }
+
+  function openKeyModal(mode: Exclude<KeyModalMode, null>) {
+    setKeyModalMode(mode);
+    setKeyModalPassphrase('');
+    setKeyModalFile(null);
+    setFlowError('');
+  }
+
+  function closeKeyModal() {
+    if (keyActionPending) {
+      return;
+    }
+
+    setKeyModalMode(null);
+    setKeyModalPassphrase('');
+    setKeyModalFile(null);
   }
 
   async function refreshMessages() {
@@ -667,6 +674,15 @@ export default function WalletConnect() {
 
         {view === 'agents' ? <AgentMessages language={language} /> : null}
 
+        {view === 'groups' ? (
+          <GroupChat
+            language={language}
+            onOpenKeyCenter={() => openKeyModal(hasOwnKey ? (localKeyStored ? 'unlock' : 'import') : 'register')}
+          />
+        ) : null}
+
+        {view === 'bulk' ? <BulkSender language={language} /> : null}
+
         {view === 'history' ? (
           <HistoryView
             t={t}
@@ -752,7 +768,14 @@ function AppHeader({
           <button type="button" onClick={onMenu} className="btn-ghost h-10 w-10 lg:hidden" aria-label={menuOpen ? t.header.close : t.header.menu}>
             {menuOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
-          <img src="/arcanum-logo.png" alt="Arcanum logo" className="h-9 w-28 object-contain sm:h-11 sm:w-40" />
+          <Image
+            src="/arcanum-logo.png"
+            alt="Arcanum logo"
+            width={160}
+            height={44}
+            className="h-9 w-28 object-contain sm:h-11 sm:w-40"
+            priority
+          />
           <div className="min-w-0">
             <p className="truncate text-xs text-zinc-500">{t.header.tagline}</p>
           </div>
@@ -832,8 +855,10 @@ function AppSidebar({
   onView: (view: AppView) => void;
   onKeyCenter: () => void;
 }) {
-  const items: Array<{ view: AppView; label: string; icon: JSX.Element }> = [
+  const items: Array<{ view: AppView; label: string; icon: ReactNode }> = [
     { view: 'dm', label: t.nav.dm, icon: <MessageCircle size={16} /> },
+    { view: 'groups', label: t.nav.groups, icon: <UsersRound size={16} /> },
+    { view: 'bulk', label: t.nav.bulk, icon: <Layers3 size={16} /> },
     { view: 'agents', label: t.nav.agents, icon: <Bot size={16} /> },
     { view: 'history', label: t.nav.history, icon: <History size={16} /> },
     { view: 'about', label: t.nav.about, icon: <Info size={16} /> },
@@ -857,6 +882,10 @@ function AppSidebar({
             <span className="truncate">{item.label}</span>
           </button>
         ))}
+        <Link href="/how-it-works" className="nav-item nav-item-idle">
+          <BookOpen size={16} />
+          <span className="truncate">{t.nav.how}</span>
+        </Link>
       </nav>
 
       <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-950 p-3">
@@ -1627,7 +1656,7 @@ function MessageText({ message, viewer, t }: { message: ChainMessage; viewer?: `
   );
 }
 
-function InfoPanel({ title, eyebrow, items, icon }: { title: string; eyebrow: string; items: readonly string[]; icon: JSX.Element }) {
+function InfoPanel({ title, eyebrow, items, icon }: { title: string; eyebrow: string; items: readonly string[]; icon: ReactNode }) {
   return (
     <section className="panel min-h-[560px]">
       <div className="panel-header">
@@ -1688,7 +1717,7 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Tab({ active, icon, label, onClick }: { active: boolean; icon: JSX.Element; label: string; onClick: () => void }) {
+function Tab({ active, icon, label, onClick }: { active: boolean; icon: ReactNode; label: string; onClick: () => void }) {
   return (
     <button type="button" onClick={onClick} className={`inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium transition ${active ? 'bg-white text-zinc-950' : 'text-zinc-400 hover:bg-zinc-800'}`}>
       {icon}
@@ -1697,7 +1726,7 @@ function Tab({ active, icon, label, onClick }: { active: boolean; icon: JSX.Elem
   );
 }
 
-function Pill({ tone, icon, label }: { tone: 'success' | 'warning' | 'info'; icon?: JSX.Element; label: string }) {
+function Pill({ tone, icon, label }: { tone: 'success' | 'warning' | 'info'; icon?: ReactNode; label: string }) {
   const toneClass = {
     success: 'border-emerald-400/25 bg-emerald-400/10 text-emerald-200',
     warning: 'border-amber-300/25 bg-amber-300/10 text-amber-200',

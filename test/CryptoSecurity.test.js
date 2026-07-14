@@ -63,6 +63,7 @@ describe('crypto security hardening', function () {
 
   const sender = '0x1111111111111111111111111111111111111111';
   const recipient = '0x2222222222222222222222222222222222222222';
+  const recipientTwo = '0x4444444444444444444444444444444444444444';
   const contractAddress = '0x3333333333333333333333333333333333333333';
   const chainId = 5042002;
 
@@ -145,6 +146,96 @@ describe('crypto security hardening', function () {
         recipientAddress: recipient,
       }),
       'PRIVATE_PAYLOAD_CHAIN_MISMATCH',
+    );
+  });
+
+  it('encrypts one group ciphertext and decrypts member-specific wrapped keys', async function () {
+    const cryptoModule = loadCryptoModule();
+    const senderKeys = await cryptoModule.ensureEncryptionKeyPair(sender, 'sender-passphrase');
+    const recipientKeys = await cryptoModule.ensureEncryptionKeyPair(recipient, 'recipient-passphrase');
+    const context = {
+      chainId,
+      contractAddress,
+      groupId: 7n,
+      senderAddress: sender,
+      membershipVersion: 3n,
+    };
+    const encrypted = await cryptoModule.encryptGroupMessage(
+      'group secret',
+      [
+        { address: sender, publicKey: senderKeys.publicKey },
+        { address: recipient, publicKey: recipientKeys.publicKey },
+      ],
+      context,
+    );
+
+    expect(encrypted.wrappedKeys).to.have.lengthOf(2);
+    expect(await cryptoModule.decryptGroupMessage(
+      encrypted.ciphertext,
+      encrypted.cryptoMeta,
+      encrypted.wrappedKeys[0],
+      sender,
+      context,
+    )).to.equal('group secret');
+    expect(await cryptoModule.decryptGroupMessage(
+      encrypted.ciphertext,
+      encrypted.cryptoMeta,
+      encrypted.wrappedKeys[1],
+      recipient,
+      context,
+    )).to.equal('group secret');
+  });
+
+  it('binds group payloads to group, contract, membership version, and recipient key', async function () {
+    const cryptoModule = loadCryptoModule();
+    const senderKeys = await cryptoModule.ensureEncryptionKeyPair(sender, 'sender-passphrase');
+    const recipientKeys = await cryptoModule.ensureEncryptionKeyPair(recipient, 'recipient-passphrase');
+    await cryptoModule.ensureEncryptionKeyPair(recipientTwo, 'recipient-two-passphrase');
+    const context = {
+      chainId,
+      contractAddress,
+      groupId: 8n,
+      senderAddress: sender,
+      membershipVersion: 4n,
+    };
+    const encrypted = await cryptoModule.encryptGroupMessage(
+      'bound group secret',
+      [
+        { address: sender, publicKey: senderKeys.publicKey },
+        { address: recipient, publicKey: recipientKeys.publicKey },
+      ],
+      context,
+    );
+
+    await expectRejects(
+      cryptoModule.decryptGroupMessage(
+        encrypted.ciphertext,
+        encrypted.cryptoMeta,
+        encrypted.wrappedKeys[1],
+        recipient,
+        { ...context, groupId: 9n },
+      ),
+      'GROUP_META_ID_MISMATCH',
+    );
+    await expectRejects(
+      cryptoModule.decryptGroupMessage(
+        encrypted.ciphertext,
+        encrypted.cryptoMeta,
+        encrypted.wrappedKeys[1],
+        recipient,
+        { ...context, membershipVersion: 5n },
+      ),
+      'GROUP_META_MEMBERSHIP_MISMATCH',
+    );
+    await expectRejects(
+      cryptoModule.decryptGroupMessage(
+        encrypted.ciphertext,
+        encrypted.cryptoMeta,
+        encrypted.wrappedKeys[1],
+        recipientTwo,
+        context,
+      ),
+      'GROUP_RECIPIENT_KEY_MISMATCH',
     );
   });
 });

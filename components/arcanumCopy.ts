@@ -2,10 +2,13 @@ export const copy = {
   en: {
     nav: {
       dm: 'Direct Messages',
+      groups: 'Group Chat',
+      bulk: 'Bulk Sender',
       agents: 'Agent Messages',
       history: 'Inbox / Sent',
       about: 'About Arcanum',
       faq: 'FAQ',
+      how: 'How It Works',
     },
     header: {
       tagline: 'Private on-chain messaging on Arc Testnet.',
@@ -156,10 +159,13 @@ export const copy = {
   tr: {
     nav: {
       dm: 'Direkt Mesajlar',
+      groups: 'Grup Sohbeti',
+      bulk: 'Bulk Sender',
       agents: 'Agent Mesajlari',
       history: 'Inbox / Sent',
       about: 'Arcanum Hakkında',
       faq: 'SSS',
+      how: 'Nasıl Çalışır?',
     },
     header: {
       tagline: 'Arc Testnet üzerinde gizli on-chain mesajlaşma.',
