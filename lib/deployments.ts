@@ -18,4 +18,12 @@ export const arcTestnetDeployments = {
     address: '0xD1B9D190fC8F86c94E35B7a02Bf8E9d048832Cea',
     blockNumber: 51780401,
   },
+  gigBoard: {
+    address: '0x595f7d521e30dd8FDD9E0130e778ce1E63e909A0',
+    blockNumber: 52109905,
+  },
+  escrow: {
+    address: '0x993d0903f45376c0746572Af69f9577179A2A350',
+    blockNumber: 52109913,
+  },
 } as const;
