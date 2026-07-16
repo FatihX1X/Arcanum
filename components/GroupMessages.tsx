@@ -24,6 +24,7 @@ import {
   type GroupMessageRecord,
   type GroupRecord,
 } from '../lib/groupsContract';
+import { readableRpcError, withRpcRetry } from '../lib/rpc';
 import type { Language } from './arcanumCopy';
 
 type GroupView = {
@@ -52,6 +53,7 @@ const text = {
     rekey: 'Saving members creates a new epoch. New members cannot read old messages and removed members cannot read new ones.',
     encrypted: 'Encrypted message', owner: 'Owner', memberCount: 'members', groupCount: 'groups', emptyMessages: 'No messages in this group yet.', openExplorer: 'Explorer', select: 'Choose a group to start chatting.',
     failed: 'Action failed', close: 'Close', saving: 'Waiting for wallet', noKey: 'Encryption key unavailable for this epoch.',
+    rateLimited: 'Arc RPC is busy right now. The request was retried safely; wait a few seconds and try again.',
   },
   tr: {
     eyebrow: 'Grup sohbeti', title: 'Şifreli Gruplar', refresh: 'Yenile', empty: 'Henüz şifreli grup yok.',
@@ -68,6 +70,7 @@ const text = {
     rekey: 'Üyeleri kaydetmek yeni epoch oluşturur. Yeni üyeler geçmişi, çıkarılan üyeler yeni mesajları okuyamaz.',
     encrypted: 'Şifreli mesaj', owner: 'Sahip', memberCount: 'üye', groupCount: 'grup', emptyMessages: 'Bu grupta henüz mesaj yok.', openExplorer: 'Explorer', select: 'Sohbete başlamak için bir grup seçin.',
     failed: 'İşlem başarısız', close: 'Kapat', saving: 'Cüzdan bekleniyor', noKey: 'Bu epoch için şifreleme anahtarı yok.',
+    rateLimited: 'Arc RPC şu anda yoğun. İstek güvenli biçimde yeniden denendi; birkaç saniye bekleyip tekrar deneyin.',
   },
 } as const;
 
@@ -113,12 +116,12 @@ export default function GroupMessages({ language }: { language: Language }) {
 
   const readEnvelopeKey = useCallback(async (groupId: `0x${string}`, epoch: number, viewer: `0x${string}`) => {
     if (!publicClient) return null;
-    const envelope = await publicClient.readContract({
+    const envelope = await withRpcRetry(() => publicClient.readContract({
       address: arcanumGroupsAddress,
       abi: arcanumGroupsAbi,
       functionName: 'getKeyEnvelope',
       args: [groupId, BigInt(epoch), viewer],
-    }) as string;
+    })) as string;
     if (!envelope) return null;
     return openGroupKeyEnvelope(envelope, viewer, {
       chainId: arcNetworkTestnet.id,
@@ -137,18 +140,18 @@ export default function GroupMessages({ language }: { language: Language }) {
     setLoading(true);
     setError('');
     try {
-      const ids = await publicClient.readContract({
+      const ids = await withRpcRetry(() => publicClient.readContract({
         address: arcanumGroupsAddress,
         abi: arcanumGroupsAbi,
         functionName: 'getGroupsFor',
         args: [address],
-      }) as readonly `0x${string}`[];
+      })) as readonly `0x${string}`[];
 
       const loaded = await Promise.all(ids.map(async (groupId): Promise<GroupView> => {
         const [record, members, count] = await Promise.all([
-          publicClient.readContract({ address: arcanumGroupsAddress, abi: arcanumGroupsAbi, functionName: 'getGroup', args: [groupId] }),
-          publicClient.readContract({ address: arcanumGroupsAddress, abi: arcanumGroupsAbi, functionName: 'getMembers', args: [groupId] }),
-          publicClient.readContract({ address: arcanumGroupsAddress, abi: arcanumGroupsAbi, functionName: 'messageCount', args: [groupId] }),
+          withRpcRetry(() => publicClient.readContract({ address: arcanumGroupsAddress, abi: arcanumGroupsAbi, functionName: 'getGroup', args: [groupId] })),
+          withRpcRetry(() => publicClient.readContract({ address: arcanumGroupsAddress, abi: arcanumGroupsAbi, functionName: 'getMembers', args: [groupId] })),
+          withRpcRetry(() => publicClient.readContract({ address: arcanumGroupsAddress, abi: arcanumGroupsAbi, functionName: 'messageCount', args: [groupId] })),
         ]) as [GroupRecord, readonly `0x${string}`[], bigint];
 
         const currentEpoch = Number(record.currentEpoch);
@@ -182,12 +185,12 @@ export default function GroupMessages({ language }: { language: Language }) {
 
         const limit = count > 100n ? 100n : count;
         const offset = count > 100n ? count - 100n : 0n;
-        const messageRecords = limit === 0n ? [] : await publicClient.readContract({
+        const messageRecords = limit === 0n ? [] : await withRpcRetry(() => publicClient.readContract({
           address: arcanumGroupsAddress,
           abi: arcanumGroupsAbi,
           functionName: 'getMessagesPage',
           args: [groupId, offset, limit],
-        }) as readonly GroupMessageRecord[];
+        })) as readonly GroupMessageRecord[];
 
         const messages = await Promise.all(messageRecords.map(async (item) => {
           const key = await keyFor(Number(item.epoch));
@@ -218,11 +221,11 @@ export default function GroupMessages({ language }: { language: Language }) {
       setGroups(loaded);
       setSelectedId((current) => current && loaded.some((group) => group.record.id === current) ? current : loaded[0]?.record.id ?? '');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : copy.failed);
+      setError(readableRpcError(cause, copy.failed, copy.rateLimited));
     } finally {
       setLoading(false);
     }
-  }, [address, copy.encrypted, copy.failed, copy.noKey, isCorrectChain, publicClient, readEnvelopeKey]);
+  }, [address, copy.encrypted, copy.failed, copy.noKey, copy.rateLimited, isCorrectChain, publicClient, readEnvelopeKey]);
 
   useEffect(() => { void refresh(); }, [refresh]);
 
@@ -241,16 +244,17 @@ export default function GroupMessages({ language }: { language: Language }) {
 
   async function memberKeys(members: `0x${string}`[]) {
     if (!publicClient) throw new Error(copy.failed);
-    const keys = await Promise.all(members.map(async (member): Promise<GroupMemberKey> => {
-      const publicKey = await publicClient.readContract({
+    const keys: GroupMemberKey[] = [];
+    for (const member of members) {
+      const publicKey = await withRpcRetry(() => publicClient.readContract({
         address: arcanumMessengerAddress,
         abi: arcanumMessengerAbi,
         functionName: 'encryptionKeys',
         args: [member],
-      }) as string;
+      }), { retries: 4, baseDelayMs: 750 }) as string;
       if (!publicKey) throw new Error(`${copy.keyMissing} ${short(member)}`);
-      return { address: member, publicKey };
-    }));
+      keys.push({ address: member, publicKey });
+    }
     return keys;
   }
 
@@ -290,7 +294,7 @@ export default function GroupMessages({ language }: { language: Language }) {
       setHash(nextHash);
       setStatus(copy.pending);
     } catch (cause) {
-      const value = cause instanceof Error ? cause.message : copy.failed;
+      const value = readableRpcError(cause, copy.failed, copy.rateLimited);
       setError(value.includes('LOCAL_KEY') || value.includes('NO_LOCAL_KEY') ? copy.unlock : value);
       setStatus('');
     }
@@ -324,7 +328,7 @@ export default function GroupMessages({ language }: { language: Language }) {
       setHash(nextHash);
       setStatus(copy.pending);
     } catch (cause) {
-      const value = cause instanceof Error ? cause.message : copy.failed;
+      const value = readableRpcError(cause, copy.failed, copy.rateLimited);
       setError(value.includes('LOCAL_KEY') || value.includes('NO_LOCAL_KEY') ? copy.unlock : value);
       setStatus('');
     }
@@ -343,6 +347,11 @@ export default function GroupMessages({ language }: { language: Language }) {
     setMemberInput(selected.members.filter((member) => member.toLowerCase() !== address.toLowerCase()).join('\n'));
     setError('');
     setModal('members');
+  }
+
+  function closeModal() {
+    setModal(null);
+    setError('');
   }
 
   const unavailable = !isConnected ? copy.noWallet : !isCorrectChain ? copy.wrongChain : !isArcanumGroupsConfigured ? copy.notConfigured : '';
@@ -364,7 +373,7 @@ export default function GroupMessages({ language }: { language: Language }) {
         </div>
 
         {unavailable ? <Notice>{unavailable}</Notice> : null}
-        {error ? <div className="helper-danger mt-4">{error}</div> : null}
+        {error && !modal ? <div className="helper-danger mt-4" role="alert">{error}</div> : null}
         {status ? (
           <div className="mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-sky-300/20 bg-sky-300/10 px-3 py-2 text-sm text-sky-100">
             {receipt.isLoading || walletPending ? <Loader2 size={15} className="animate-spin" /> : receipt.isSuccess ? <CheckCircle2 size={15} /> : <ShieldCheck size={15} />}
@@ -451,17 +460,17 @@ export default function GroupMessages({ language }: { language: Language }) {
           <form onSubmit={submitGroup} className="modal-panel max-h-[90vh] overflow-y-auto">
             <div className="flex items-start justify-between gap-3">
               <div><p className="eyebrow">{copy.eyebrow}</p><h3 className="mt-2 text-xl font-semibold text-white">{modal === 'create' ? copy.create : copy.manage}</h3></div>
-              <button type="button" onClick={() => setModal(null)} disabled={walletPending || receipt.isLoading} className="btn-ghost h-9 w-9" aria-label={copy.close}><X size={16} /></button>
+              <button type="button" onClick={closeModal} disabled={walletPending || receipt.isLoading} className="btn-ghost h-9 w-9" aria-label={copy.close}><X size={16} /></button>
             </div>
             <div className="mt-5 grid gap-4">
               <label className="grid gap-2"><span className="text-xs font-medium text-zinc-400">{copy.name}</span><input className="input" value={groupName} onChange={(event) => setGroupName(event.target.value)} maxLength={64} required /></label>
               <label className="grid gap-2"><span className="text-xs font-medium text-zinc-400">{copy.members}</span><textarea className="input min-h-36 resize-y py-3 font-mono text-xs" value={memberInput} onChange={(event) => setMemberInput(event.target.value)} placeholder="0x…\n0x…" /></label>
               <p className="text-xs leading-5 text-zinc-500">{copy.membersHint}</p>
               <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-sm text-zinc-400"><p>{parsedMemberInput.members.length}/25 {copy.memberCount}</p><p className="mt-2 leading-6">{modal === 'members' ? copy.rekey : copy.privacy}</p></div>
-              {error ? <div className="helper-danger">{error}</div> : null}
+              {error ? <div className="helper-danger" role="alert">{error}</div> : null}
             </div>
             <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <button type="button" onClick={() => setModal(null)} disabled={walletPending || receipt.isLoading} className="btn-ghost h-10 px-4">{copy.cancel}</button>
+              <button type="button" onClick={closeModal} disabled={walletPending || receipt.isLoading} className="btn-ghost h-10 px-4">{copy.cancel}</button>
               <button type="submit" disabled={!groupName.trim() || parsedMemberInput.invalid || parsedMemberInput.members.length < 2 || walletPending || receipt.isLoading} className="btn-primary h-10 px-4">{walletPending || receipt.isLoading ? <Loader2 size={15} className="animate-spin" /> : <ShieldCheck size={15} />}{copy.continue}</button>
             </div>
           </form>

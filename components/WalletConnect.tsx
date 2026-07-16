@@ -202,6 +202,7 @@ export default function WalletConnect() {
   const recipientValid = isAddress(activeRecipient);
   const recipientSelf = Boolean(address && recipientValid && activeRecipient.toLowerCase() === address.toLowerCase());
   const trimmedMessage = message.trim();
+  const messageReadsEnabled = view === 'dm' || view === 'history';
 
   const { data: ownKey, refetch: refetchOwnKey } = useReadContract({
     address: arcanumMessengerAddress,
@@ -216,7 +217,7 @@ export default function WalletConnect() {
     abi: arcanumMessengerAbi,
     functionName: 'encryptionKeys',
     args: [recipientValid ? (activeRecipient as `0x${string}`) : zeroAddress],
-    query: { enabled: isConnected && isCorrectChain && isArcanumMessengerConfigured && privacy === 'private' && recipientValid },
+    query: { enabled: messageReadsEnabled && isConnected && isCorrectChain && isArcanumMessengerConfigured && privacy === 'private' && recipientValid },
   });
 
   const { data: inboxMessages, refetch: refetchInbox, isFetching: inboxFetching } = useReadContract({
@@ -224,7 +225,7 @@ export default function WalletConnect() {
     abi: arcanumMessengerAbi,
     functionName: 'getInbox',
     args: [connectedAddress],
-    query: { enabled: isConnected && isCorrectChain && isArcanumMessengerConfigured },
+    query: { enabled: messageReadsEnabled && isConnected && isCorrectChain && isArcanumMessengerConfigured },
   });
 
   const { data: sentMessages, refetch: refetchSent, isFetching: sentFetching } = useReadContract({
@@ -232,7 +233,7 @@ export default function WalletConnect() {
     abi: arcanumMessengerAbi,
     functionName: 'getOutbox',
     args: [connectedAddress],
-    query: { enabled: isConnected && isCorrectChain && isArcanumMessengerConfigured },
+    query: { enabled: messageReadsEnabled && isConnected && isCorrectChain && isArcanumMessengerConfigured },
   });
 
   const receipt = useWaitForTransactionReceipt({ hash: pendingHash, query: { enabled: Boolean(pendingHash) } });
