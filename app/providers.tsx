@@ -15,12 +15,23 @@ const config = createConfig({
     }),
   ],
   transports: {
-    [arcNetworkTestnet.id]: http(arcNetworkTestnet.rpcUrls.default.http[0]),
+    [arcNetworkTestnet.id]: http(arcNetworkTestnet.rpcUrls.default.http[0], {
+      batch: { batchSize: 20, wait: 16 },
+      retryCount: 4,
+      retryDelay: 500,
+    }),
   },
 });
 
 export function Providers({ children }: { children: ReactNode }) {
-  const [queryClient] = useState(() => new QueryClient());
+  const [queryClient] = useState(() => new QueryClient({
+    defaultOptions: {
+      queries: {
+        refetchOnWindowFocus: false,
+        staleTime: 15_000,
+      },
+    },
+  }));
 
   return (
     <WagmiProvider config={config}>
