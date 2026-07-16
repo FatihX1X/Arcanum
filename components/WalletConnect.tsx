@@ -28,6 +28,7 @@ import {
   Search,
   Send,
   Shield,
+  ShieldCheck,
   Upload,
   UsersRound,
   Wallet,
@@ -69,10 +70,11 @@ import {
 import AgentMessages from './AgentMessages';
 import BulkSender from './BulkSender';
 import GroupMessages from './GroupMessages';
+import ArcanumEscrow from './ArcanumEscrow';
 import { copy, type Language } from './arcanumCopy';
 
 type PrivacyMode = 'private' | 'public';
-type AppView = 'dm' | 'groups' | 'bulk' | 'agents' | 'history' | 'about' | 'faq';
+type AppView = 'dm' | 'groups' | 'bulk' | 'agents' | 'escrow' | 'history' | 'about' | 'faq';
 type HistoryTab = 'inbox' | 'sent';
 type KeyModalMode = 'unlock' | 'register' | 'export' | 'import' | null;
 type TransactionStep = 'idle' | 'preparing' | 'wallet' | 'pending' | 'success' | 'error';
@@ -678,6 +680,8 @@ export default function WalletConnect() {
 
         {view === 'bulk' ? <BulkSender language={language} /> : null}
 
+        {view === 'escrow' ? <ArcanumEscrow language={language} onOpenKeyCenter={() => openKeyModal(hasOwnKey ? (localKeyStored ? 'unlock' : 'import') : 'register')} /> : null}
+
         {view === 'history' ? (
           <HistoryView
             t={t}
@@ -855,6 +859,7 @@ function AppSidebar({
     { view: 'groups', label: t.nav.groups, icon: <UsersRound size={16} /> },
     { view: 'bulk', label: t.nav.bulk, icon: <Layers3 size={16} /> },
     { view: 'agents', label: t.nav.agents, icon: <Bot size={16} /> },
+    { view: 'escrow', label: t.nav.escrow, icon: <ShieldCheck size={16} /> },
     { view: 'history', label: t.nav.history, icon: <History size={16} /> },
     { view: 'about', label: t.nav.about, icon: <Info size={16} /> },
     { view: 'faq', label: t.nav.faq, icon: <HelpCircle size={16} /> },

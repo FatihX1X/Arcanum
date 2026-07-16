@@ -94,6 +94,33 @@ export type PrivatePayloadContext = MessageCryptoContext & {
   recipientPublicKey?: string;
 };
 
+type EscrowChatPayloadV1 = {
+  version: 1;
+  type: 'arcanum-escrow-chat';
+  alg: 'ECDH-P256-HKDF-SHA256-AES-GCM';
+  meta: {
+    chainId: number;
+    contractAddress: string;
+    conversationId: string;
+    sender: string;
+    recipient: string;
+    senderPublicKey: string;
+    recipientPublicKey: string;
+    senderKeyId: string;
+    recipientKeyId: string;
+  };
+  recipient: EncryptedCopy;
+  sender: EncryptedCopy;
+};
+
+export type EscrowChatCryptoContext = {
+  chainId: number;
+  contractAddress: string;
+  conversationId: bigint | number | string;
+  senderAddress: string;
+  recipientAddress: string;
+};
+
 function storageKey(address: string) {
   return `${storagePrefix}${address.toLowerCase()}`;
 }
@@ -352,6 +379,22 @@ function aadFor(meta: EncryptedPayloadV3['meta'], role: 'sender' | 'recipient') 
   ].join('|');
 }
 
+function escrowChatAad(meta: EscrowChatPayloadV1['meta'], role: 'sender' | 'recipient') {
+  return [
+    'arcanum',
+    'escrow-chat',
+    'v1',
+    String(meta.chainId),
+    meta.contractAddress.toLowerCase(),
+    meta.conversationId,
+    meta.sender.toLowerCase(),
+    meta.recipient.toLowerCase(),
+    meta.senderKeyId,
+    meta.recipientKeyId,
+    role,
+  ].join('|');
+}
+
 export async function ensureEncryptionKeyPair(address: string, passphrase?: string) {
   const stored = await readKeyPair(address, passphrase, true);
 
@@ -575,6 +618,91 @@ export async function decryptMessage(payload: string, viewerAddress: string) {
   const aad = aadFor(parsed.meta, role);
   const aesKey = await deriveV3AesKey(viewerPrivateKey, peerPublicKey, aad);
 
+  return decryptCopy(copy, aesKey, aad);
+}
+
+export async function encryptEscrowChatMessage(
+  message: string,
+  recipientPublicKey: string,
+  context: EscrowChatCryptoContext,
+  passphrase?: string,
+) {
+  const senderKeys = await ensureEncryptionKeyPair(context.senderAddress, passphrase);
+  const senderPrivateKey = await importPrivateKey(senderKeys.privateKey);
+  const recipientKey = await importPublicKey(recipientPublicKey);
+  const senderKey = await importPublicKey(senderKeys.publicKey);
+  const meta: EscrowChatPayloadV1['meta'] = {
+    chainId: context.chainId,
+    contractAddress: normalizeAddress(context.contractAddress),
+    conversationId: String(context.conversationId),
+    sender: normalizeAddress(context.senderAddress),
+    recipient: normalizeAddress(context.recipientAddress),
+    senderPublicKey: senderKeys.publicKey,
+    recipientPublicKey,
+    senderKeyId: await sha256Base64Url(senderKeys.publicKey),
+    recipientKeyId: await sha256Base64Url(recipientPublicKey),
+  };
+  const recipientAad = escrowChatAad(meta, 'recipient');
+  const senderAad = escrowChatAad(meta, 'sender');
+  const recipientAesKey = await deriveV3AesKey(senderPrivateKey, recipientKey, recipientAad);
+  const senderAesKey = await deriveV3AesKey(senderPrivateKey, senderKey, senderAad);
+  const encrypted: EscrowChatPayloadV1 = {
+    version: 1,
+    type: 'arcanum-escrow-chat',
+    alg: 'ECDH-P256-HKDF-SHA256-AES-GCM',
+    meta,
+    recipient: await encryptCopy(message, recipientAesKey, recipientAad),
+    sender: await encryptCopy(message, senderAesKey, senderAad),
+  };
+  return JSON.stringify(encrypted);
+}
+
+export async function assertEscrowChatPayload(payload: string, expected: EscrowChatCryptoContext) {
+  let parsed: EscrowChatPayloadV1;
+  try {
+    parsed = JSON.parse(payload) as EscrowChatPayloadV1;
+  } catch {
+    throw new Error('ESCROW_PAYLOAD_INVALID_JSON');
+  }
+  if (
+    !parsed ||
+    parsed.version !== 1 ||
+    parsed.type !== 'arcanum-escrow-chat' ||
+    parsed.alg !== 'ECDH-P256-HKDF-SHA256-AES-GCM' ||
+    !parsed.meta ||
+    !isEncryptedCopy(parsed.sender) ||
+    !isEncryptedCopy(parsed.recipient)
+  ) {
+    throw new Error('ESCROW_PAYLOAD_INVALID');
+  }
+  if (parsed.meta.chainId !== expected.chainId) throw new Error('ESCROW_PAYLOAD_CHAIN_MISMATCH');
+  if (normalizeAddress(parsed.meta.contractAddress) !== normalizeAddress(expected.contractAddress)) throw new Error('ESCROW_PAYLOAD_CONTRACT_MISMATCH');
+  if (parsed.meta.conversationId !== String(expected.conversationId)) throw new Error('ESCROW_PAYLOAD_CONVERSATION_MISMATCH');
+  if (normalizeAddress(parsed.meta.sender) !== normalizeAddress(expected.senderAddress)) throw new Error('ESCROW_PAYLOAD_SENDER_MISMATCH');
+  if (normalizeAddress(parsed.meta.recipient) !== normalizeAddress(expected.recipientAddress)) throw new Error('ESCROW_PAYLOAD_RECIPIENT_MISMATCH');
+  if (!parsed.meta.senderPublicKey || !parsed.meta.recipientPublicKey) throw new Error('ESCROW_PAYLOAD_KEY_METADATA_MISSING');
+  if (await sha256Base64Url(parsed.meta.senderPublicKey) !== parsed.meta.senderKeyId) throw new Error('ESCROW_PAYLOAD_SENDER_KEY_MISMATCH');
+  if (await sha256Base64Url(parsed.meta.recipientPublicKey) !== parsed.meta.recipientKeyId) throw new Error('ESCROW_PAYLOAD_RECIPIENT_KEY_MISMATCH');
+  return parsed;
+}
+
+export async function decryptEscrowChatMessage(
+  payload: string,
+  viewerAddress: string,
+  expected: EscrowChatCryptoContext,
+) {
+  const parsed = await assertEscrowChatPayload(payload, expected);
+  const viewerKeys = await readKeyPair(viewerAddress, undefined, false);
+  const viewerPrivateKey = await importPrivateKey(viewerKeys.privateKey);
+  const viewerPublicKey = publicKeyString(viewerKeys.publicKey);
+  const isSender =
+    normalizeAddress(viewerAddress) === parsed.meta.sender ||
+    viewerPublicKey === parsed.meta.senderPublicKey;
+  const role = isSender ? 'sender' : 'recipient';
+  const copy = isSender ? parsed.sender : parsed.recipient;
+  const peerKey = await importPublicKey(isSender ? parsed.meta.senderPublicKey : parsed.meta.senderPublicKey);
+  const aad = escrowChatAad(parsed.meta, role);
+  const aesKey = await deriveV3AesKey(viewerPrivateKey, peerKey, aad);
   return decryptCopy(copy, aesKey, aad);
 }
 

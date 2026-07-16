@@ -148,6 +148,36 @@ describe('crypto security hardening', function () {
     );
   });
 
+  it('binds escrow chat ciphertext to its chain, contract, conversation, and participants', async function () {
+    const cryptoModule = loadCryptoModule();
+    await cryptoModule.ensureEncryptionKeyPair(sender, 'sender-passphrase');
+    const recipientKeys = await cryptoModule.ensureEncryptionKeyPair(recipient, 'recipient-passphrase');
+    const context = {
+      chainId,
+      contractAddress,
+      conversationId: `0x${'55'.repeat(32)}`,
+      senderAddress: sender,
+      recipientAddress: recipient,
+    };
+    const payload = await cryptoModule.encryptEscrowChatMessage(
+      'escrow proposal note',
+      recipientKeys.publicKey,
+      context,
+      'sender-passphrase',
+    );
+
+    await cryptoModule.assertEscrowChatPayload(payload, context);
+    expect(await cryptoModule.decryptEscrowChatMessage(payload, recipient, context)).to.equal('escrow proposal note');
+    await expectRejects(
+      cryptoModule.assertEscrowChatPayload(payload, { ...context, conversationId: `0x${'66'.repeat(32)}` }),
+      'ESCROW_PAYLOAD_CONVERSATION_MISMATCH',
+    );
+    await expectRejects(
+      cryptoModule.assertEscrowChatPayload(payload, { ...context, contractAddress: '0x4444444444444444444444444444444444444444' }),
+      'ESCROW_PAYLOAD_CONTRACT_MISMATCH',
+    );
+  });
+
   it('encrypts group metadata and messages per epoch and member envelope', async function () {
     const cryptoModule = loadCryptoModule();
     const ownerKeys = await cryptoModule.ensureEncryptionKeyPair(sender, 'owner-passphrase');
