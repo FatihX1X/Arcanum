@@ -68,7 +68,7 @@ export function HowItWorks() {
   }
 
   return (
-    <main className="min-h-screen bg-zinc-950 px-4 py-5 text-white sm:px-6 lg:px-8">
+    <main className="app-page py-5">
       <div className="mx-auto w-full max-w-6xl">
         <header className="surface flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
           <Link href="/" className="inline-flex items-center gap-3">

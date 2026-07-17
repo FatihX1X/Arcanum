@@ -421,7 +421,7 @@ export default function GroupMessages({ language }: { language: Language }) {
                   {selected.messages.length === 0 ? <Notice>{copy.emptyMessages}</Notice> : selected.messages.map((item) => {
                     const outgoing = address ? item.sender.toLowerCase() === address.toLowerCase() : false;
                     return (
-                      <article key={`${item.epoch}-${item.id}`} className={`max-w-[88%] rounded-lg border px-3 py-2 ${outgoing ? 'ml-auto border-emerald-400/25 bg-emerald-400/10' : 'border-zinc-800 bg-zinc-950'}`}>
+                      <article key={`${item.epoch}-${item.id}`} className={`message-bubble max-w-[88%] rounded-lg border px-3 py-2 ${outgoing ? 'message-bubble-outgoing ml-auto border-emerald-400/25 bg-emerald-400/10' : 'border-zinc-800 bg-zinc-950'}`}>
                         <p className={`whitespace-pre-wrap break-words text-sm leading-6 ${item.decryptable ? 'text-zinc-100' : 'text-zinc-500'}`}>{item.text}</p>
                         <div className="mt-2 flex items-center justify-end gap-2 text-[11px] text-zinc-500">
                           <span>{short(item.sender)}</span><span>E{item.epoch.toString()}</span><span>#{item.id.toString()}</span>
@@ -448,7 +448,7 @@ export default function GroupMessages({ language }: { language: Language }) {
         type="button"
         onClick={openCreate}
         disabled={Boolean(unavailable) || walletPending || receipt.isLoading}
-        className="fixed bottom-6 right-6 z-40 inline-flex h-14 w-14 items-center justify-center rounded-full bg-emerald-400 text-zinc-950 shadow-2xl shadow-emerald-950/50 transition hover:-translate-y-1 hover:bg-emerald-300 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
+        className="theme-fab fixed bottom-6 right-6 z-40"
         aria-label={copy.create}
         title={copy.create}
       >

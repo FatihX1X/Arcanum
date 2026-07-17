@@ -34,6 +34,11 @@ export const copy = {
       keyCenter: 'Key Center',
       openKeyCenter: 'Open Key Center',
       contract: 'Contract',
+      theme: 'Theme',
+      light: 'Light',
+      dark: 'Dark',
+      lightTheme: 'Use light theme',
+      darkTheme: 'Use dark theme',
     },
     key: {
       ok: 'Key registered',
@@ -192,6 +197,11 @@ export const copy = {
       keyCenter: 'Key Center',
       openKeyCenter: 'Key Center aç',
       contract: 'Kontrat',
+      theme: 'Tema',
+      light: 'Aydınlık',
+      dark: 'Karanlık',
+      lightTheme: 'Aydınlık temayı kullan',
+      darkTheme: 'Karanlık temayı kullan',
     },
     key: {
       ok: 'Key kayıtlı',

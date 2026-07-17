@@ -692,7 +692,7 @@ function AgentBubble({
   const outgoing = viewer ? message.sender.toLowerCase() === viewer.toLowerCase() : false;
 
   return (
-    <article className={`max-w-[88%] rounded-lg border px-3 py-2 ${outgoing ? 'ml-auto border-emerald-400/25 bg-emerald-400/10' : 'mr-auto border-zinc-800 bg-zinc-900'}`}>
+    <article className={`message-bubble max-w-[88%] rounded-lg border px-3 py-2 ${outgoing ? 'message-bubble-outgoing ml-auto border-emerald-400/25 bg-emerald-400/10' : 'mr-auto border-zinc-800 bg-zinc-900'}`}>
       <AgentMessageText message={message} viewer={viewer} copy={copy} />
       {message.paymentAmount > BigInt(0) ? (
         <p className="mt-2 inline-flex items-center gap-1 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2.5 py-1 text-xs font-medium text-emerald-200">
