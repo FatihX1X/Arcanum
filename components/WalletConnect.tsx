@@ -23,12 +23,14 @@ import {
   Lock,
   Menu,
   MessageCircle,
+  Moon,
   Github,
   RefreshCw,
   Search,
   Send,
   Shield,
   ShieldCheck,
+  Sun,
   Upload,
   UsersRound,
   Wallet,
@@ -78,6 +80,7 @@ type AppView = 'dm' | 'groups' | 'bulk' | 'agents' | 'escrow' | 'history' | 'abo
 type HistoryTab = 'inbox' | 'sent';
 type KeyModalMode = 'unlock' | 'register' | 'export' | 'import' | null;
 type TransactionStep = 'idle' | 'preparing' | 'wallet' | 'pending' | 'success' | 'error';
+type ThemeMode = 'light' | 'dark';
 type EthereumProvider = {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
 };
@@ -171,6 +174,7 @@ export default function WalletConnect() {
   const { writeContractAsync, isPending: isWritePending, error: writeError } = useWriteContract();
 
   const [language, setLanguageState] = useState<Language>('en');
+  const [theme, setThemeState] = useState<ThemeMode>('dark');
   const [view, setView] = useState<AppView>('dm');
   const [menuOpen, setMenuOpen] = useState(false);
   const [newRecipient, setNewRecipient] = useState('');
@@ -327,6 +331,10 @@ export default function WalletConnect() {
   }, []);
 
   useEffect(() => {
+    setThemeState(document.documentElement.dataset.theme === 'light' ? 'light' : 'dark');
+  }, []);
+
+  useEffect(() => {
     refreshLocalKeyStatus();
   }, [refreshLocalKeyStatus]);
 
@@ -371,6 +379,13 @@ export default function WalletConnect() {
   function setLanguage(next: Language) {
     setLanguageState(next);
     localStorage.setItem('arcanum.language', next);
+  }
+
+  function setTheme(next: ThemeMode) {
+    document.documentElement.dataset.theme = next;
+    document.documentElement.style.colorScheme = next;
+    localStorage.setItem('arcanum.theme', next);
+    setThemeState(next);
   }
 
   function chooseView(next: AppView) {
@@ -606,8 +621,10 @@ export default function WalletConnect() {
             hasOwnKey={hasOwnKey}
             hasLocalKey={localKeyStored}
             localUnlocked={localKeyUnlocked}
+            theme={theme}
             onView={chooseView}
             onKeyCenter={() => openKeyModal(hasOwnKey ? (localKeyStored ? 'unlock' : 'import') : 'register')}
+            onTheme={setTheme}
           />
         </div>
       ) : null}
@@ -628,8 +645,10 @@ export default function WalletConnect() {
             hasOwnKey={hasOwnKey}
             hasLocalKey={localKeyStored}
             localUnlocked={localKeyUnlocked}
+            theme={theme}
             onView={chooseView}
             onKeyCenter={() => openKeyModal(hasOwnKey ? (localKeyStored ? 'unlock' : 'import') : 'register')}
+            onTheme={setTheme}
           />
         </div>
 
@@ -840,8 +859,10 @@ function AppSidebar({
   hasOwnKey,
   hasLocalKey,
   localUnlocked,
+  theme,
   onView,
   onKeyCenter,
+  onTheme,
 }: {
   t: (typeof copy)[Language];
   view: AppView;
@@ -852,8 +873,10 @@ function AppSidebar({
   hasOwnKey: boolean;
   hasLocalKey: boolean;
   localUnlocked: boolean;
+  theme: ThemeMode;
   onView: (view: AppView) => void;
   onKeyCenter: () => void;
+  onTheme: (theme: ThemeMode) => void;
 }) {
   const items: Array<{ view: AppView; label: string; icon: ReactNode }> = [
     { view: 'dm', label: t.nav.dm, icon: <MessageCircle size={16} /> },
@@ -867,7 +890,7 @@ function AppSidebar({
   ];
 
   return (
-    <aside className="surface p-3">
+    <aside className="surface flex min-h-[640px] flex-col p-3">
       <div className="border-b border-zinc-800 px-2 pb-3">
         <p className="eyebrow">{t.sidebar.protocol}</p>
         <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
@@ -905,6 +928,32 @@ function AppSidebar({
           <FileKey2 size={14} />
           {t.sidebar.openKeyCenter}
         </button>
+      </div>
+
+      <div className="theme-control mt-auto">
+        <p className="px-1 text-xs font-medium text-zinc-500">{t.sidebar.theme}</p>
+        <div className="theme-switch" role="group" aria-label={t.sidebar.theme}>
+          <button
+            type="button"
+            onClick={() => onTheme('light')}
+            className={`theme-option ${theme === 'light' ? 'theme-option-active' : ''}`}
+            aria-pressed={theme === 'light'}
+            title={t.sidebar.lightTheme}
+          >
+            <Sun size={15} />
+            <span>{t.sidebar.light}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onTheme('dark')}
+            className={`theme-option ${theme === 'dark' ? 'theme-option-active' : ''}`}
+            aria-pressed={theme === 'dark'}
+            title={t.sidebar.darkTheme}
+          >
+            <Moon size={15} />
+            <span>{t.sidebar.dark}</span>
+          </button>
+        </div>
       </div>
     </aside>
   );
@@ -1565,7 +1614,7 @@ function HistoryView({
 function MessageBubble({ message, viewer, language, t }: { message: ChainMessage; viewer?: `0x${string}`; language: Language; t: (typeof copy)[Language] }) {
   const outgoing = viewer ? message.sender.toLowerCase() === viewer.toLowerCase() : false;
   return (
-    <article className={`max-w-[88%] rounded-lg border px-3 py-2 ${outgoing ? 'ml-auto border-emerald-400/25 bg-emerald-400/10' : 'mr-auto border-zinc-800 bg-zinc-900'}`}>
+    <article className={`message-bubble max-w-[88%] rounded-lg border px-3 py-2 ${outgoing ? 'message-bubble-outgoing ml-auto border-emerald-400/25 bg-emerald-400/10' : 'mr-auto border-zinc-800 bg-zinc-900'}`}>
       <MessageText message={message} viewer={viewer} t={t} />
       <div className="mt-2 flex flex-wrap items-center justify-end gap-2 text-[11px] text-zinc-500">
         <Pill tone={message.isPrivate ? 'success' : 'info'} label={message.isPrivate ? t.common.private : t.common.public} />
