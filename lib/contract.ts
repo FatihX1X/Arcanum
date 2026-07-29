@@ -17,6 +17,17 @@ export const messageFeeLabel = {
 
 export const arcanumMessengerAbi = [
   {
+    type: 'event',
+    name: 'MessageSent',
+    inputs: [
+      { name: 'id', type: 'uint256', indexed: true },
+      { name: 'sender', type: 'address', indexed: true },
+      { name: 'recipient', type: 'address', indexed: true },
+      { name: 'isPrivate', type: 'bool', indexed: false },
+      { name: 'timestamp', type: 'uint256', indexed: false },
+    ],
+  },
+  {
     type: 'function',
     name: 'PRIVATE_MESSAGE_FEE',
     stateMutability: 'view',

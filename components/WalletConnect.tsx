@@ -17,7 +17,6 @@ import {
   FileKey2,
   HelpCircle,
   History,
-  Inbox,
   Info,
   KeyRound,
   Layers3,
@@ -86,9 +85,17 @@ const CircleSwap = dynamic(() => import('./CircleSwap'), {
   ),
 });
 
+const ArcanumHistory = dynamic(() => import('./ArcanumHistory'), {
+  ssr: false,
+  loading: () => (
+    <section className="panel flex min-h-[680px] items-center justify-center">
+      <RefreshCw size={20} className="animate-spin text-violet-300" />
+    </section>
+  ),
+});
+
 type PrivacyMode = 'private' | 'public';
 type AppView = 'dm' | 'groups' | 'bulk' | 'swap' | 'agents' | 'escrow' | 'history' | 'about' | 'faq';
-type HistoryTab = 'inbox' | 'sent';
 type KeyModalMode = 'unlock' | 'register' | 'export' | 'import' | null;
 type TransactionStep = 'idle' | 'preparing' | 'wallet' | 'pending' | 'success' | 'error';
 type ThemeMode = 'light' | 'dark';
@@ -106,7 +113,6 @@ type Conversation = {
   latest: ChainMessage;
 };
 
-const historyPageSize = 8;
 const xProfileUrl = 'https://x.com/0xFatih';
 const githubRepoUrl = 'https://github.com/FatihX1X/Arcanum';
 
@@ -193,8 +199,6 @@ export default function WalletConnect() {
   const [conversationSearch, setConversationSearch] = useState('');
   const [message, setMessage] = useState('');
   const [privacy, setPrivacy] = useState<PrivacyMode>('private');
-  const [historyTab, setHistoryTab] = useState<HistoryTab>('inbox');
-  const [historyVisible, setHistoryVisible] = useState(historyPageSize);
   const [status, setStatus] = useState('');
   const [txStep, setTxStep] = useState<TransactionStep>('idle');
   const [flowError, setFlowError] = useState('');
@@ -217,7 +221,7 @@ export default function WalletConnect() {
   const recipientValid = isAddress(activeRecipient);
   const recipientSelf = Boolean(address && recipientValid && activeRecipient.toLowerCase() === address.toLowerCase());
   const trimmedMessage = message.trim();
-  const messageReadsEnabled = view === 'dm' || view === 'history';
+  const messageReadsEnabled = view === 'dm';
 
   const { data: ownKey, refetch: refetchOwnKey } = useReadContract({
     address: arcanumMessengerAddress,
@@ -277,8 +281,6 @@ export default function WalletConnect() {
     trimmedMessage.length > 0 &&
     !isWritePending;
   const txUrl = transactionUrl(lastHash ?? pendingHash ?? '');
-  const historySource = historyTab === 'inbox' ? inbox : sent;
-  const visibleHistory = historySource.slice(0, historyVisible);
   const errors = [flowError, connectError?.message, switchError?.message, writeError?.message, receipt.error?.message].filter(Boolean) as string[];
 
   const refreshLocalKeyStatus = useCallback(() => {
@@ -715,27 +717,7 @@ export default function WalletConnect() {
 
         {view === 'escrow' ? <ArcanumEscrow language={language} onOpenKeyCenter={() => openKeyModal(hasOwnKey ? (localKeyStored ? 'unlock' : 'import') : 'register')} /> : null}
 
-        {view === 'history' ? (
-          <HistoryView
-            t={t}
-            language={language}
-            isConnected={isConnected}
-            isCorrectChain={isCorrectChain}
-            viewer={address}
-            tab={historyTab}
-            messages={visibleHistory}
-            total={historySource.length}
-            visible={historyVisible}
-            isFetching={inboxFetching || sentFetching}
-            onTab={(next) => {
-              setHistoryTab(next);
-              setHistoryVisible(historyPageSize);
-            }}
-            onRefresh={() => void refreshMessages()}
-            onMore={() => setHistoryVisible((value) => value + historyPageSize)}
-            onOpen={(messageToOpen) => replyTo(historyTab === 'inbox' ? messageToOpen.sender : messageToOpen.recipient)}
-          />
-        ) : null}
+        {view === 'history' ? <ArcanumHistory language={language} /> : null}
 
         {view === 'about' ? <InfoPanel title={t.nav.about} eyebrow="Protocol" items={t.about} icon={<Info size={14} />} /> : null}
         {view === 'faq' ? <FaqPanel title={t.nav.faq} items={t.faq} /> : null}
@@ -1550,81 +1532,6 @@ function KeyCenterModal({
   );
 }
 
-function HistoryView({
-  t,
-  language,
-  isConnected,
-  isCorrectChain,
-  viewer,
-  tab,
-  messages,
-  total,
-  visible,
-  isFetching,
-  onTab,
-  onRefresh,
-  onMore,
-  onOpen,
-}: {
-  t: (typeof copy)[Language];
-  language: Language;
-  isConnected: boolean;
-  isCorrectChain: boolean;
-  viewer?: `0x${string}`;
-  tab: HistoryTab;
-  messages: ChainMessage[];
-  total: number;
-  visible: number;
-  isFetching: boolean;
-  onTab: (tab: HistoryTab) => void;
-  onRefresh: () => void;
-  onMore: () => void;
-  onOpen: (message: ChainMessage) => void;
-}) {
-  return (
-    <section className="panel min-h-[640px]">
-      <div className="panel-header">
-        <div>
-          <p className="eyebrow">History</p>
-          <h2 className="panel-title">{t.history.title}</h2>
-        </div>
-        <button type="button" onClick={onRefresh} disabled={!isConnected || !isCorrectChain} className="btn-ghost h-10 px-3">
-          <RefreshCw size={16} className={isFetching ? 'animate-spin' : ''} />
-          {t.history.refresh}
-        </button>
-      </div>
-      <div className="mt-4 grid grid-cols-2 rounded-lg border border-zinc-800 bg-zinc-950 p-1">
-        <Tab active={tab === 'inbox'} icon={<Inbox size={16} />} label={t.history.inbox} onClick={() => onTab('inbox')} />
-        <Tab active={tab === 'sent'} icon={<Send size={16} />} label={t.history.sent} onClick={() => onTab('sent')} />
-      </div>
-      <div className="mt-4 grid gap-3 lg:grid-cols-2">
-        {!isConnected ? <Empty title={t.common.disconnected} body={t.dm.noWallet} /> : null}
-        {isConnected && !isCorrectChain ? <Empty title={t.header.wrong} body={t.header.switch} /> : null}
-        {isConnected && isCorrectChain && total === 0 ? <Empty title={t.history.empty} body={t.history.empty} /> : null}
-        {isCorrectChain && messages.map((item) => (
-          <MessageCard
-            key={`${tab}-${item.id.toString()}`}
-            message={item}
-            viewer={viewer}
-            language={language}
-            t={t}
-            action={tab === 'inbox' ? t.history.reply : t.history.open}
-            onAction={() => onOpen(item)}
-          />
-        ))}
-      </div>
-      {visible < total ? (
-        <div className="mt-4 flex justify-center">
-          <button type="button" onClick={onMore} className="btn-ghost h-10 px-4">
-            {t.history.loadMore}
-            <span className="text-zinc-500">{Math.min(visible, total)}/{total}</span>
-          </button>
-        </div>
-      ) : null}
-    </section>
-  );
-}
-
 function MessageBubble({ message, viewer, language, t }: { message: ChainMessage; viewer?: `0x${string}`; language: Language; t: (typeof copy)[Language] }) {
   const outgoing = viewer ? message.sender.toLowerCase() === viewer.toLowerCase() : false;
   return (
@@ -1635,41 +1542,6 @@ function MessageBubble({ message, viewer, language, t }: { message: ChainMessage
         <span>{time(message.timestamp, language)}</span>
         <span>#{message.id.toString()}</span>
       </div>
-    </article>
-  );
-}
-
-function MessageCard({
-  message,
-  viewer,
-  language,
-  t,
-  action,
-  onAction,
-}: {
-  message: ChainMessage;
-  viewer?: `0x${string}`;
-  language: Language;
-  t: (typeof copy)[Language];
-  action: string;
-  onAction: () => void;
-}) {
-  return (
-    <article className="chat-card p-4">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <Pill tone={message.isPrivate ? 'success' : 'info'} icon={message.isPrivate ? <Lock size={13} /> : <Shield size={13} />} label={message.isPrivate ? t.common.private : t.common.public} />
-        <span className="font-mono text-xs text-zinc-500">#{message.id.toString()}</span>
-      </div>
-      <MessageText message={message} viewer={viewer} t={t} />
-      <div className="mt-4 grid gap-2 text-xs text-zinc-500 sm:grid-cols-2">
-        <span>{t.history.from} {short(message.sender)}</span>
-        <span>{t.history.to} {short(message.recipient)}</span>
-        <span className="sm:col-span-2">{t.history.time} {time(message.timestamp, language)}</span>
-      </div>
-      <button type="button" onClick={onAction} className="btn-ghost mt-4 h-10 px-3">
-        <MessageCircle size={15} />
-        {action}
-      </button>
     </article>
   );
 }

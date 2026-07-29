@@ -37,6 +37,18 @@ const agentTuple = [
 
 export const arcanumAgentsAbi = [
   {
+    type: 'event',
+    name: 'AgentMessageSent',
+    inputs: [
+      { name: 'id', type: 'uint256', indexed: true },
+      { name: 'sender', type: 'address', indexed: true },
+      { name: 'recipient', type: 'address', indexed: true },
+      { name: 'isPrivate', type: 'bool', indexed: false },
+      { name: 'paymentAmount', type: 'uint256', indexed: false },
+      { name: 'timestamp', type: 'uint256', indexed: false },
+    ],
+  },
+  {
     type: 'function',
     name: 'PRIVATE_MESSAGE_FEE',
     stateMutability: 'view',
@@ -139,6 +151,42 @@ export const arcanumAgentsAbi = [
     stateMutability: 'view',
     inputs: [{ name: 'account', type: 'address' }],
     outputs: [{ name: '', type: 'tuple[]', components: agentMessageTuple }],
+  },
+  {
+    type: 'function',
+    name: 'getInboxPage',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'account', type: 'address' },
+      { name: 'offset', type: 'uint256' },
+      { name: 'limit', type: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'tuple[]', components: agentMessageTuple }],
+  },
+  {
+    type: 'function',
+    name: 'getOutboxPage',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'account', type: 'address' },
+      { name: 'offset', type: 'uint256' },
+      { name: 'limit', type: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'tuple[]', components: agentMessageTuple }],
+  },
+  {
+    type: 'function',
+    name: 'getInboxCount',
+    stateMutability: 'view',
+    inputs: [{ name: 'account', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'getOutboxCount',
+    stateMutability: 'view',
+    inputs: [{ name: 'account', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
   },
   {
     type: 'function',
