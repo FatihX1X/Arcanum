@@ -33,6 +33,8 @@ import { arcNetworkTestnet, transactionUrl } from '../lib/chain';
 import {
   arcSwapTokens,
   assertSwapEstimateIntegrity,
+  circleSwapProxyUrl,
+  createAccountScopedSwapProvider,
   defaultSwapSlippageBps,
   estimateGasReserveUsdc,
   formatSwapUnits,
@@ -60,11 +62,32 @@ type QuoteState = {
 const erc20BalanceAbi = parseAbi([
   'function balanceOf(address account) view returns (uint256)',
 ]);
-const swapKit = new SwapKit();
+const swapKit = new SwapKit({ disableErrorReporting: true });
 const arcCircleChain = getChainByEnum(Blockchain.Arc_Testnet);
 const slippageOptions = [10, 50, 100] as const;
 const circleSwapDocsUrl = 'https://docs.arc.io/app-kit/swap';
 const faucetUrl = 'https://faucet.circle.com/';
+const circleFetchProxyFlag = '__arcanumCircleFetchProxyInstalled';
+
+function installCircleFetchProxy() {
+  const browserWindow = window as Window & {
+    __arcanumCircleFetchProxyInstalled?: boolean;
+  };
+  if (browserWindow[circleFetchProxyFlag]) return;
+
+  const nativeFetch = window.fetch.bind(window);
+  window.fetch = (input, init) => {
+    const requestUrl = input instanceof Request ? input.url : input.toString();
+    const proxyUrl = circleSwapProxyUrl(requestUrl, window.location.origin);
+    if (!proxyUrl) return nativeFetch(input, init);
+
+    if (input instanceof Request) {
+      return nativeFetch(new Request(proxyUrl, input), init);
+    }
+    return nativeFetch(proxyUrl, init);
+  };
+  browserWindow[circleFetchProxyFlag] = true;
+}
 
 function createArcBrowserAdapter(provider: EIP1193Provider) {
   return createViemAdapterFromProvider({
@@ -121,6 +144,8 @@ const swapCopy = {
     errors: {
       rejected: 'The wallet request was rejected.',
       'wrong-chain': 'The wallet is not connected to Arc Testnet.',
+      'wallet-provider': 'The connected wallet account could not be accessed. Reconnect the wallet and try again.',
+      'service-unavailable': 'The Circle quote service could not be reached. Please retry in a moment.',
       'insufficient-balance': 'The wallet does not have enough token balance or native USDC for gas.',
       'quote-expired': 'The quote expired. Request a new quote.',
       'rate-limited': 'The Arc or Circle service is busy. Please try again shortly.',
@@ -172,6 +197,8 @@ const swapCopy = {
     errors: {
       rejected: 'Cüzdan isteği reddedildi.',
       'wrong-chain': 'Cüzdan Arc Testnet’e bağlı değil.',
+      'wallet-provider': 'Bağlı cüzdan hesabına erişilemedi. Cüzdanı yeniden bağlayıp tekrar deneyin.',
+      'service-unavailable': 'Circle fiyat servisine erişilemedi. Kısa süre sonra tekrar deneyin.',
       'insufficient-balance': 'Token bakiyesi veya gas için native USDC yetersiz.',
       'quote-expired': 'Fiyatın süresi doldu. Yeni fiyat alın.',
       'rate-limited': 'Arc veya Circle servisi yoğun. Kısa süre sonra yeniden deneyin.',
@@ -210,7 +237,7 @@ function shortAddress(value: string) {
 
 export default function CircleSwap({ language }: { language: Language }) {
   const t = swapCopy[language];
-  const { address, isConnected } = useAccount();
+  const { address, connector, isConnected } = useAccount();
   const chainId = useChainId();
   const isCorrectChain = chainId === arcNetworkTestnet.id;
   const adapterRef = useRef<{ account: string; adapter: BrowserAdapter } | null>(null);
@@ -252,6 +279,10 @@ export default function CircleSwap({ language }: { language: Language }) {
     query: { enabled: Boolean(pendingHash) },
   });
 
+  useEffect(() => {
+    installCircleFetchProxy();
+  }, []);
+
   const balances = useMemo<Record<SwapTokenSymbol, bigint>>(() => ({
     USDC: usdcBalance ?? 0n,
     EURC: eurcBalance ?? 0n,
@@ -279,17 +310,30 @@ export default function CircleSwap({ language }: { language: Language }) {
 
   const getAdapter = useCallback(async () => {
     if (!address) throw new Error('WALLET_NOT_CONNECTED');
-    const provider = (window as Window & { ethereum?: EIP1193Provider }).ethereum;
-    if (!provider) throw new Error('WALLET_PROVIDER_UNAVAILABLE');
+    const connectorProvider = await connector?.getProvider({
+      chainId: arcNetworkTestnet.id,
+    });
+    if (
+      !connectorProvider
+      || typeof connectorProvider !== 'object'
+      || !('request' in connectorProvider)
+      || typeof connectorProvider.request !== 'function'
+    ) {
+      throw new Error('WALLET_PROVIDER_UNAVAILABLE');
+    }
 
     if (adapterRef.current?.account.toLowerCase() === address.toLowerCase()) {
       return adapterRef.current.adapter;
     }
 
+    const provider = createAccountScopedSwapProvider(
+      connectorProvider as EIP1193Provider,
+      address,
+    ) as EIP1193Provider;
     const adapter = await createArcBrowserAdapter(provider);
     adapterRef.current = { account: address, adapter };
     return adapter;
-  }, [address]);
+  }, [address, connector]);
 
   const requestQuote = useCallback(async () => {
     const normalizedAmount = normalizeSwapAmount(amount);
@@ -332,6 +376,7 @@ export default function CircleSwap({ language }: { language: Language }) {
       setPhase('ready');
     } catch (error) {
       if (requestId !== requestIdRef.current) return;
+      console.error('[CircleSwap] Quote failed', error);
       setQuote(null);
       setPhase('error');
       setFlowError(readableSwapError(error, language));
@@ -446,6 +491,7 @@ export default function CircleSwap({ language }: { language: Language }) {
         setPhase('pending');
       }
     } catch (error) {
+      console.error('[CircleSwap] Swap failed', error);
       setPhase('error');
       setFlowError(readableSwapError(error, language));
     }
