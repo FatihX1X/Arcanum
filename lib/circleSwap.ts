@@ -12,11 +12,17 @@ export type SwapTokenSymbol = 'USDC' | 'EURC';
 export type SwapErrorKind =
   | 'rejected'
   | 'wrong-chain'
+  | 'wallet-provider'
+  | 'service-unavailable'
   | 'insufficient-balance'
   | 'quote-expired'
   | 'rate-limited'
   | 'route-unavailable'
   | 'unknown';
+
+export type SwapEip1193Provider = {
+  request(args: { method: string; params?: unknown }): Promise<unknown>;
+};
 
 export type SwapToken = {
   symbol: SwapTokenSymbol;
@@ -141,11 +147,64 @@ export function quoteExchangeRate(amountIn: string, amountOut: string) {
   return Number(outputUnits) / Number(inputUnits);
 }
 
+export function circleSwapProxyUrl(requestUrl: string, applicationOrigin: string) {
+  try {
+    const url = new URL(requestUrl);
+    if (
+      url.origin !== 'https://api.circle.com'
+      || !url.pathname.startsWith('/v1/stablecoinKits/')
+    ) {
+      return null;
+    }
+
+    const relativePath = url.pathname.slice('/v1/stablecoinKits/'.length);
+    if (!relativePath) return null;
+
+    const proxyUrl = new URL(`/api/circle-swap/${relativePath}`, applicationOrigin);
+    proxyUrl.search = url.search;
+    return proxyUrl.toString();
+  } catch {
+    return null;
+  }
+}
+
+export function createAccountScopedSwapProvider(
+  provider: SwapEip1193Provider,
+  connectedAccount: string,
+): SwapEip1193Provider {
+  const expectedAccount = connectedAccount.toLowerCase();
+
+  return {
+    async request(args) {
+      const result = await provider.request(args);
+      if (args.method !== 'eth_accounts' && args.method !== 'eth_requestAccounts') {
+        return result;
+      }
+
+      const accounts = Array.isArray(result)
+        ? result.filter((account): account is string => typeof account === 'string')
+        : [];
+      const connected = accounts.find((account) => account.toLowerCase() === expectedAccount);
+      if (!connected) {
+        throw new Error('WALLET_ACCOUNT_MISMATCH');
+      }
+
+      return [connected];
+    },
+  };
+}
+
 export function swapErrorKind(error: unknown): SwapErrorKind {
   const text = errorText(error).toLowerCase();
 
   if (/reject|denied|declined|cancelled|canceled/.test(text)) return 'rejected';
   if (/wrong chain|chain mismatch|unsupported chain|switch chain/.test(text)) return 'wrong-chain';
+  if (/wallet.*unavailable|provider.*unavailable|account mismatch|wallet_account_mismatch/.test(text)) {
+    return 'wallet-provider';
+  }
+  if (/failed to fetch|cors|service_unknown_error|stablecoin service.*failed/.test(text)) {
+    return 'service-unavailable';
+  }
   if (/insufficient|exceeds balance|not enough funds|funds for gas/.test(text)) return 'insufficient-balance';
   if (/expired|stale quote|quote.*invalid/.test(text)) return 'quote-expired';
   if (/rate limit|too many requests|\b429\b|request limit reached/.test(text)) return 'rate-limited';

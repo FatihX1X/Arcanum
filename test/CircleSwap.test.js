@@ -54,12 +54,67 @@ describe('Circle swap safeguards', function () {
     expect(swap.quoteExchangeRate('0', '9.25')).to.equal(null);
   });
 
+  it('rewrites only Circle Stablecoin Kit requests to the same-origin proxy', function () {
+    expect(swap.circleSwapProxyUrl(
+      'https://api.circle.com/v1/stablecoinKits/swap?foo=bar',
+      'https://www.arcanumchat.xyz',
+    )).to.equal('https://www.arcanumchat.xyz/api/circle-swap/swap?foo=bar');
+    expect(swap.circleSwapProxyUrl(
+      'https://api.circle.com/v1/stablecoinKits/swap/status?txHash=0x1',
+      'https://www.arcanumchat.xyz',
+    )).to.equal('https://www.arcanumchat.xyz/api/circle-swap/swap/status?txHash=0x1');
+    expect(swap.circleSwapProxyUrl(
+      'https://example.com/v1/stablecoinKits/swap',
+      'https://www.arcanumchat.xyz',
+    )).to.equal(null);
+  });
+
   it('classifies wallet, balance, stale quote, rate limit, and route failures', function () {
     expect(swap.swapErrorKind(new Error('User rejected the request'))).to.equal('rejected');
+    expect(swap.swapErrorKind(new Error('WALLET_ACCOUNT_MISMATCH'))).to.equal('wallet-provider');
+    expect(swap.swapErrorKind(new Error('Stablecoin Service createSwap failed: Failed to fetch')))
+      .to.equal('service-unavailable');
     expect(swap.swapErrorKind(new Error('insufficient funds for gas'))).to.equal('insufficient-balance');
     expect(swap.swapErrorKind(new Error('stale quote'))).to.equal('quote-expired');
     expect(swap.swapErrorKind({ cause: { details: '429 Too Many Requests' } })).to.equal('rate-limited');
     expect(swap.swapErrorKind(new Error('No route with enough liquidity'))).to.equal('route-unavailable');
+  });
+
+  it('scopes the Circle adapter to the account selected by the active connector', async function () {
+    const calls = [];
+    const provider = swap.createAccountScopedSwapProvider({
+      async request(args) {
+        calls.push(args.method);
+        if (args.method === 'eth_accounts') {
+          return [
+            '0x0000000000000000000000000000000000000001',
+            account,
+          ];
+        }
+        return '0x4cef52';
+      },
+    }, account);
+
+    expect(await provider.request({ method: 'eth_accounts' })).to.deep.equal([account]);
+    expect(await provider.request({ method: 'eth_chainId' })).to.equal('0x4cef52');
+    expect(calls).to.deep.equal(['eth_accounts', 'eth_chainId']);
+  });
+
+  it('rejects a connector provider that does not expose the connected account', async function () {
+    const provider = swap.createAccountScopedSwapProvider({
+      async request() {
+        return ['0x0000000000000000000000000000000000000001'];
+      },
+    }, account);
+
+    let error;
+    try {
+      await provider.request({ method: 'eth_accounts' });
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).to.be.instanceOf(Error);
+    expect(error.message).to.equal('WALLET_ACCOUNT_MISMATCH');
   });
 
   it('accepts an intact mock estimate from the connected account', function () {
