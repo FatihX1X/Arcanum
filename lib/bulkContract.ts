@@ -19,4 +19,24 @@ export const arcanumBulkSenderAbi = [
     ],
     outputs: [{ name: '', type: 'uint256' }],
   },
+  {
+    type: 'event',
+    name: 'BatchSent',
+    inputs: [
+      { name: 'batchId', type: 'uint256', indexed: true },
+      { name: 'sender', type: 'address', indexed: true },
+      { name: 'recipientCount', type: 'uint256', indexed: false },
+      { name: 'totalAmount', type: 'uint256', indexed: false },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'TransferSent',
+    inputs: [
+      { name: 'batchId', type: 'uint256', indexed: true },
+      { name: 'index', type: 'uint256', indexed: true },
+      { name: 'recipient', type: 'address', indexed: true },
+      { name: 'amount', type: 'uint256', indexed: false },
+    ],
+  },
 ] as const;

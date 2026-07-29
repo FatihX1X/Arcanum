@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   CircleDollarSign,
   ExternalLink,
-  Info,
   Loader2,
   RefreshCw,
   ShieldCheck,
@@ -50,6 +49,7 @@ import {
   type SwapErrorKind,
   type SwapTokenSymbol,
 } from '../lib/circleSwap';
+import { saveLocalSwapHistory, updateLocalSwapStatus } from '../lib/history';
 import type { Language } from './arcanumCopy';
 
 type SwapPhase = 'idle' | 'quoting' | 'ready' | 'wallet' | 'pending' | 'success' | 'error';
@@ -65,8 +65,6 @@ const erc20BalanceAbi = parseAbi([
 const swapKit = new SwapKit({ disableErrorReporting: true });
 const arcCircleChain = getChainByEnum(Blockchain.Arc_Testnet);
 const slippageOptions = [10, 50, 100] as const;
-const circleSwapDocsUrl = 'https://docs.arc.io/app-kit/swap';
-const faucetUrl = 'https://faucet.circle.com/';
 const circleFetchProxyFlag = '__arcanumCircleFetchProxyInstalled';
 
 function installCircleFetchProxy() {
@@ -130,10 +128,6 @@ const swapCopy = {
     pending: 'Transaction pending',
     success: 'Swap completed',
     approval: 'Permit is preferred; the SDK falls back to ERC-20 approval when needed.',
-    official: 'Official Arc assets',
-    officialBody: 'USDC and EURC both use 6-decimal ERC-20 interfaces. The route is selected by Circle at execution time.',
-    docs: 'Swap documentation',
-    faucet: 'Testnet faucet',
     statusIdle: 'Waiting for amount',
     statusQuoting: 'Requesting quote',
     statusReady: 'Quote ready',
@@ -183,10 +177,6 @@ const swapCopy = {
     pending: 'İşlem bekleniyor',
     success: 'Swap tamamlandı',
     approval: 'Önce permit denenir; gerekirse SDK otomatik ERC-20 approval kullanır.',
-    official: 'Resmî Arc varlıkları',
-    officialBody: 'USDC ve EURC, 6 ondalıklı ERC-20 arayüzlerini kullanır. Rota işlem anında Circle tarafından seçilir.',
-    docs: 'Swap dokümantasyonu',
-    faucet: 'Testnet faucet',
     statusIdle: 'Miktar bekleniyor',
     statusQuoting: 'Fiyat alınıyor',
     statusReady: 'Fiyat hazır',
@@ -208,11 +198,6 @@ const swapCopy = {
   },
 } as const;
 
-function tokenExplorerUrl(address: string) {
-  const baseUrl = arcNetworkTestnet.blockExplorers?.default.url.replace(/\/$/, '');
-  return baseUrl ? `${baseUrl}/address/${address}` : undefined;
-}
-
 function phaseLabel(phase: SwapPhase, language: Language) {
   const t = swapCopy[language];
   const labels: Record<SwapPhase, string> = {
@@ -229,10 +214,6 @@ function phaseLabel(phase: SwapPhase, language: Language) {
 
 function readableSwapError(error: unknown, language: Language) {
   return swapCopy[language].errors[swapErrorKind(error)];
-}
-
-function shortAddress(value: string) {
-  return `${value.slice(0, 6)}…${value.slice(-4)}`;
 }
 
 export default function CircleSwap({ language }: { language: Language }) {
@@ -416,16 +397,18 @@ export default function CircleSwap({ language }: { language: Language }) {
 
   useEffect(() => {
     if (!receipt.isSuccess) return;
+    if (address && pendingHash) updateLocalSwapStatus(address, pendingHash, 'confirmed');
     setPhase('success');
     setPendingHash(undefined);
     void Promise.all([refetchUsdc(), refetchEurc()]);
-  }, [receipt.isSuccess, refetchEurc, refetchUsdc]);
+  }, [address, pendingHash, receipt.isSuccess, refetchEurc, refetchUsdc]);
 
   useEffect(() => {
     if (!receipt.isError || !receipt.error) return;
+    if (address && pendingHash) updateLocalSwapStatus(address, pendingHash, 'failed');
     setPhase('error');
     setFlowError(readableSwapError(receipt.error, language));
-  }, [language, receipt.error, receipt.isError]);
+  }, [address, language, pendingHash, receipt.error, receipt.isError]);
 
   function flipTokens() {
     setTokenIn(tokenOut);
@@ -482,6 +465,19 @@ export default function CircleSwap({ language }: { language: Language }) {
       });
 
       const hash = result.txHash as `0x${string}`;
+      saveLocalSwapHistory({
+        chainId: arcNetworkTestnet.id,
+        address,
+        timestamp: Date.now(),
+        status: result.progress.status === 'DONE' ? 'confirmed' : 'pending',
+        txHash: hash,
+        tokenIn,
+        tokenOut,
+        amountIn: result.amountIn,
+        amountOut: latestEstimate.estimatedOutput.amount,
+        minimumOut: latestEstimate.stopLimit.amount,
+        fees: latestEstimate.fees?.map((fee) => `${fee.amount ?? '—'} ${fee.token}`),
+      });
       setLastHash(hash);
       if (result.progress.status === 'DONE') {
         setPhase('success');
@@ -700,33 +696,6 @@ export default function CircleSwap({ language }: { language: Language }) {
           </a>
         ) : null}
 
-        <article className="chat-card p-4">
-          <div className="flex items-start gap-3">
-            <Info size={18} className="mt-0.5 shrink-0 text-sky-300" />
-            <div>
-              <h3 className="font-semibold text-zinc-100">{t.official}</h3>
-              <p className="mt-1 text-sm leading-6 text-zinc-500">{t.officialBody}</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {(Object.keys(arcSwapTokens) as SwapTokenSymbol[]).map((symbol) => {
-                  const token = arcSwapTokens[symbol];
-                  const url = tokenExplorerUrl(token.address);
-                  return url ? (
-                    <a key={symbol} href={url} target="_blank" rel="noreferrer" className="btn-ghost h-9 px-3 font-mono text-xs">
-                      {symbol} {shortAddress(token.address)}
-                      <ExternalLink size={13} />
-                    </a>
-                  ) : null;
-                })}
-                <a href={circleSwapDocsUrl} target="_blank" rel="noreferrer" className="btn-ghost h-9 px-3 text-xs">
-                  {t.docs}<ExternalLink size={13} />
-                </a>
-                <a href={faucetUrl} target="_blank" rel="noreferrer" className="btn-ghost h-9 px-3 text-xs">
-                  {t.faucet}<ExternalLink size={13} />
-                </a>
-              </div>
-            </div>
-          </div>
-        </article>
       </div>
     </section>
   );
