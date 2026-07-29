@@ -2,10 +2,12 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   AlertTriangle,
   Archive,
+  ArrowLeftRight,
   BookOpen,
   Bot,
   CheckCircle2,
@@ -75,8 +77,17 @@ import GroupMessages from './GroupMessages';
 import ArcanumEscrow from './ArcanumEscrow';
 import { copy, type Language } from './arcanumCopy';
 
+const CircleSwap = dynamic(() => import('./CircleSwap'), {
+  ssr: false,
+  loading: () => (
+    <section className="panel flex min-h-[680px] items-center justify-center">
+      <RefreshCw size={20} className="animate-spin text-emerald-300" />
+    </section>
+  ),
+});
+
 type PrivacyMode = 'private' | 'public';
-type AppView = 'dm' | 'groups' | 'bulk' | 'agents' | 'escrow' | 'history' | 'about' | 'faq';
+type AppView = 'dm' | 'groups' | 'bulk' | 'swap' | 'agents' | 'escrow' | 'history' | 'about' | 'faq';
 type HistoryTab = 'inbox' | 'sent';
 type KeyModalMode = 'unlock' | 'register' | 'export' | 'import' | null;
 type TransactionStep = 'idle' | 'preparing' | 'wallet' | 'pending' | 'success' | 'error';
@@ -700,6 +711,8 @@ export default function WalletConnect() {
 
         {view === 'bulk' ? <BulkSender language={language} /> : null}
 
+        {view === 'swap' ? <CircleSwap language={language} /> : null}
+
         {view === 'escrow' ? <ArcanumEscrow language={language} onOpenKeyCenter={() => openKeyModal(hasOwnKey ? (localKeyStored ? 'unlock' : 'import') : 'register')} /> : null}
 
         {view === 'history' ? (
@@ -882,6 +895,7 @@ function AppSidebar({
     { view: 'dm', label: t.nav.dm, icon: <MessageCircle size={16} /> },
     { view: 'groups', label: t.nav.groups, icon: <UsersRound size={16} /> },
     { view: 'bulk', label: t.nav.bulk, icon: <Layers3 size={16} /> },
+    { view: 'swap', label: t.nav.swap, icon: <ArrowLeftRight size={16} /> },
     { view: 'agents', label: t.nav.agents, icon: <Bot size={16} /> },
     { view: 'escrow', label: t.nav.escrow, icon: <ShieldCheck size={16} /> },
     { view: 'history', label: t.nav.history, icon: <History size={16} /> },
