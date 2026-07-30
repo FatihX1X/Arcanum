@@ -566,39 +566,27 @@ select {
   }
 
   .arcanum-brand {
-    @apply inline-flex min-w-0 items-center gap-3;
-    color: var(--text-primary);
+    @apply inline-flex min-w-0 items-center;
   }
 
-  .arcanum-brand-compact {
-    @apply gap-0;
+  .arcanum-logo-frame {
+    display: inline-flex;
+    width: 146px;
+    height: 40px;
+    flex: 0 0 auto;
+    align-items: center;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-sm);
+    background: #0b0d12;
+    padding: 5px 7px;
   }
 
-  .arcanum-mark {
-    @apply h-9 w-auto shrink-0;
-    fill: none;
-    stroke: currentColor;
-    stroke-linecap: square;
-    stroke-width: 3.5;
-  }
-
-  .arcanum-mark circle {
-    fill: var(--accent);
-    stroke: none;
-  }
-
-  .arcanum-wordmark {
-    @apply grid min-w-0;
-  }
-
-  .arcanum-name {
-    @apply text-xl font-medium tracking-[-0.035em];
-    line-height: 1;
-  }
-
-  .arcanum-tag {
-    @apply mt-1 text-[8px] font-semibold uppercase tracking-[0.12em];
-    color: var(--text-muted);
+  .arcanum-logo-image {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-width: none;
   }
 
   .status-badge,
@@ -711,16 +699,14 @@ select.input {
     min-height: 100%;
   }
 
-  .arcanum-mark {
-    height: 32px;
+  .arcanum-logo-frame {
+    width: 42px;
+    height: 40px;
+    padding: 4px;
   }
 
-  .arcanum-name {
-    font-size: 18px;
-  }
-
-  .arcanum-tag {
-    display: none;
+  .arcanum-logo-image {
+    width: 120px;
   }
 }
 
