@@ -465,7 +465,7 @@ export default function ArcanumHistory({ language }: { language: Language }) {
         </button>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-1 rounded-lg border border-zinc-800 bg-zinc-950 p-1 sm:grid-cols-3 xl:grid-cols-6">
+      <div className="segmented-control mt-4 grid-cols-2 sm:grid-cols-3 xl:grid-cols-6">
         {tabs.map((item) => (
           <button
             key={item.id}
@@ -474,7 +474,8 @@ export default function ArcanumHistory({ language }: { language: Language }) {
               setTab(item.id);
               setVisible(pageSize);
             }}
-            className={`flex min-h-10 items-center justify-center gap-2 rounded-md px-2 text-xs font-medium transition ${tab === item.id ? 'bg-violet-500/15 text-violet-300' : 'text-zinc-500 hover:bg-zinc-900 hover:text-zinc-200'}`}
+            className={`segment-option px-2 text-xs ${tab === item.id ? 'segment-option-active' : ''}`}
+            aria-pressed={tab === item.id}
           >
             {item.icon}
             <span>{t.tabs[item.id]}</span>
@@ -520,7 +521,7 @@ function HistoryCard({ item, account, language, t }: { item: HistoryItem; accoun
     <article className="chat-card p-4 [content-visibility:auto]">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <span className="mt-0.5 rounded-lg border border-zinc-800 bg-zinc-950 p-2 text-violet-300">
+          <span className="text-accent mt-0.5 rounded-lg border border-zinc-800 bg-zinc-950 p-2">
             {item.kind === 'message' ? (item.direction === 'incoming' ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />) : item.kind === 'swap' ? <ArrowDownLeft size={16} /> : item.kind === 'escrow' ? <ShieldCheck size={16} /> : <Layers3 size={16} />}
           </span>
           <div>
@@ -528,7 +529,7 @@ function HistoryCard({ item, account, language, t }: { item: HistoryItem; accoun
             <p className="mt-1 text-xs text-zinc-500">{formatTimestamp(item.timestamp, language)}</p>
           </div>
         </div>
-        <span className={`rounded-full border px-2 py-1 text-[11px] ${item.status === 'confirmed' ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : item.status === 'failed' ? 'border-rose-400/20 bg-rose-400/10 text-rose-300' : 'border-amber-300/20 bg-amber-300/10 text-amber-200'}`}>
+        <span className={`rounded-full border px-2 py-1 text-[11px] ${item.status === 'confirmed' ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : item.status === 'failed' ? 'border-red-400/20 bg-red-400/10 text-red-300' : 'border-amber-300/20 bg-amber-300/10 text-amber-200'}`}>
           {t.statuses[item.status]}
         </span>
       </div>
@@ -562,7 +563,7 @@ function HistoryCard({ item, account, language, t }: { item: HistoryItem; accoun
             </div>
             {item.recipients.length ? (
               <>
-                <button type="button" onClick={() => setExpanded((value) => !value)} className="mt-3 flex items-center gap-2 text-xs font-medium text-violet-300">
+                <button type="button" onClick={() => setExpanded((value) => !value)} className="text-accent mt-3 flex items-center gap-2 text-xs font-medium">
                   {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                   {expanded ? t.hideRecipients : t.showRecipients}
                 </button>
@@ -583,7 +584,7 @@ function HistoryCard({ item, account, language, t }: { item: HistoryItem; accoun
       </div>
 
       {txUrl ? (
-        <a href={txUrl} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-2 text-xs font-medium text-violet-300 hover:text-violet-200">
+        <a href={txUrl} target="_blank" rel="noreferrer" className="text-accent mt-4 inline-flex items-center gap-2 text-xs font-medium">
           {t.viewTransaction}
           <ExternalLink size={13} />
         </a>

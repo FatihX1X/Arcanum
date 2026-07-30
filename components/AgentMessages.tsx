@@ -502,7 +502,7 @@ export default function AgentMessages({ language }: { language: Language }) {
   }
 
   return (
-    <section className="grid min-w-0 gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
+    <section className="communication-layout">
       <aside className="panel min-h-[560px]">
         <div className="panel-header">
           <div>
@@ -563,7 +563,7 @@ export default function AgentMessages({ language }: { language: Language }) {
                     setSelected(conversation.address);
                     setRecipientInput('');
                   }}
-                  className={`chat-card p-3 text-left ${activeRecipient.toLowerCase() === conversation.address.toLowerCase() ? 'border-emerald-400/40 bg-emerald-400/10' : ''}`}
+                  className={`chat-card p-3 text-left ${activeRecipient.toLowerCase() === conversation.address.toLowerCase() ? 'is-active' : ''}`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -612,7 +612,7 @@ export default function AgentMessages({ language }: { language: Language }) {
           </div>
         </div>
 
-        <div className="mt-4 flex min-h-[320px] flex-1 flex-col gap-3 overflow-y-auto rounded-lg border border-zinc-800 bg-black/30 p-3">
+        <div className="mt-4 flex min-h-[320px] flex-1 flex-col gap-3 overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-950 p-3">
           {!recipientValid ? <Empty title={copy.empty} body={copy.choose} /> : null}
           {recipientValid && !recipientActive ? <Empty title={copy.recipientNotAgent} body={copy.recipient} /> : null}
           {recipientValid && recipientActive && activeMessages.length === 0 ? <Empty title={copy.empty} body={copy.choose} /> : null}
@@ -762,7 +762,7 @@ function Empty({ title, body }: { title: string; body: string }) {
 
 function Tab({ active, icon, label, onClick }: { active: boolean; icon: ReactNode; label: string; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className={`inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium transition ${active ? 'bg-white text-zinc-950' : 'text-zinc-400 hover:bg-zinc-800'}`}>
+    <button type="button" onClick={onClick} className={`segment-option ${active ? 'segment-option-active' : ''}`} aria-pressed={active}>
       {icon}
       <span className="truncate">{label}</span>
     </button>
