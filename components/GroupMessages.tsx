@@ -26,6 +26,7 @@ import {
 } from '../lib/groupsContract';
 import { readableRpcError, withRpcRetry } from '../lib/rpc';
 import type { Language } from './arcanumCopy';
+import { Modal } from './ui';
 
 type GroupView = {
   record: GroupRecord;
@@ -383,7 +384,7 @@ export default function GroupMessages({ language }: { language: Language }) {
         ) : null}
 
         {!unavailable && !loading && groups.length === 0 ? (
-          <div className="mt-5 rounded-xl border border-dashed border-zinc-800 bg-zinc-950/70 px-5 py-12 text-center">
+          <div className="mt-5 rounded-xl border border-dashed border-zinc-800 bg-zinc-950 px-5 py-12 text-center">
             <UsersRound className="mx-auto text-zinc-600" size={30} />
             <p className="mt-4 text-sm font-medium text-zinc-200">{copy.empty}</p>
             <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-zinc-500">{copy.emptyBody}</p>
@@ -391,10 +392,10 @@ export default function GroupMessages({ language }: { language: Language }) {
         ) : null}
 
         {groups.length > 0 ? (
-          <div className="mt-5 grid min-h-[500px] gap-4 lg:grid-cols-[290px_minmax(0,1fr)]">
-            <div className="grid content-start gap-2 rounded-lg border border-zinc-800 bg-black/20 p-2">
+          <div className="communication-layout mt-5 min-h-[500px]">
+            <div className="grid content-start gap-2 rounded-lg border border-zinc-800 bg-zinc-950 p-2">
               {groups.map((group) => (
-                <button key={group.record.id} type="button" onClick={() => setSelectedId(group.record.id)} className={`chat-card p-3 text-left ${selectedId === group.record.id ? 'border-emerald-400/40 bg-emerald-400/10' : ''}`}>
+                <button key={group.record.id} type="button" onClick={() => setSelectedId(group.record.id)} className={`chat-card p-3 text-left ${selectedId === group.record.id ? 'is-active' : ''}`}>
                   <div className="flex items-start justify-between gap-2">
                     <p className="truncate text-sm font-semibold text-zinc-100">{group.name}</p>
                     <span className="text-[11px] text-zinc-500">E{group.record.currentEpoch.toString()}</span>
@@ -405,7 +406,7 @@ export default function GroupMessages({ language }: { language: Language }) {
             </div>
 
             {selected ? (
-              <div className="flex min-h-[500px] flex-col rounded-lg border border-zinc-800 bg-black/20">
+              <div className="flex min-h-[500px] flex-col rounded-lg border border-zinc-800 bg-zinc-950">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 p-4">
                   <div>
                     <h3 className="font-semibold text-zinc-100">{selected.name}</h3>
@@ -456,7 +457,7 @@ export default function GroupMessages({ language }: { language: Language }) {
       </button>
 
       {modal ? (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label={modal === 'create' ? copy.create : copy.manage}>
+        <Modal label={modal === 'create' ? copy.create : copy.manage} onClose={closeModal} closeDisabled={walletPending || receipt.isLoading}>
           <form onSubmit={submitGroup} className="modal-panel max-h-[90vh] overflow-y-auto">
             <div className="flex items-start justify-between gap-3">
               <div><p className="eyebrow">{copy.eyebrow}</p><h3 className="mt-2 text-xl font-semibold text-white">{modal === 'create' ? copy.create : copy.manage}</h3></div>
@@ -474,7 +475,7 @@ export default function GroupMessages({ language }: { language: Language }) {
               <button type="submit" disabled={!groupName.trim() || parsedMemberInput.invalid || parsedMemberInput.members.length < 2 || walletPending || receipt.isLoading} className="btn-primary h-10 px-4">{walletPending || receipt.isLoading ? <Loader2 size={15} className="animate-spin" /> : <ShieldCheck size={15} />}{copy.continue}</button>
             </div>
           </form>
-        </div>
+        </Modal>
       ) : null}
     </>
   );

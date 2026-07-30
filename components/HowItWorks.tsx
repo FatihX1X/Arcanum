@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
 import {
@@ -16,6 +15,7 @@ import {
   UsersRound,
 } from 'lucide-react';
 import type { Language } from './arcanumCopy';
+import ArcanumBrand from './ArcanumBrand';
 
 const content = {
   en: {
@@ -72,7 +72,7 @@ export function HowItWorks() {
       <div className="mx-auto w-full max-w-6xl">
         <header className="surface flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
           <Link href="/" className="inline-flex items-center gap-3">
-            <Image src="/arcanum-logo.png" alt="Arcanum" width={160} height={44} className="h-10 w-auto object-contain" priority />
+            <ArcanumBrand />
           </Link>
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={toggleLanguage} className="btn-ghost h-10 px-3" aria-label={copy.language}><Languages size={15} />{language.toUpperCase()}</button>
@@ -87,12 +87,12 @@ export function HowItWorks() {
         </section>
 
         <section className="grid gap-4 lg:grid-cols-2">
-          <FlowCard icon={<LockKeyhole size={22} />} title={copy.privateTitle} body={copy.privateBody} steps={[copy.wallet, copy.browser, copy.chain, copy.recipient]} accent="emerald" />
-          <FlowCard icon={<MessageCircle size={22} />} title={copy.publicTitle} body={copy.publicBody} steps={[copy.wallet, copy.chain, copy.recipient]} accent="sky" />
-          <FlowCard icon={<Bot size={22} />} title={copy.agentTitle} body={copy.agentBody} steps={[copy.wallet, copy.browser, 'Agent contract', copy.recipient]} accent="violet" />
-          <FlowCard icon={<UsersRound size={22} />} title={copy.groupTitle} body={copy.groupBody} steps={[copy.browser, copy.keyWraps, copy.chain, copy.recipient]} accent="emerald" />
+          <FlowCard icon={<LockKeyhole size={22} />} title={copy.privateTitle} body={copy.privateBody} steps={[copy.wallet, copy.browser, copy.chain, copy.recipient]} />
+          <FlowCard icon={<MessageCircle size={22} />} title={copy.publicTitle} body={copy.publicBody} steps={[copy.wallet, copy.chain, copy.recipient]} />
+          <FlowCard icon={<Bot size={22} />} title={copy.agentTitle} body={copy.agentBody} steps={[copy.wallet, copy.browser, 'Agent contract', copy.recipient]} />
+          <FlowCard icon={<UsersRound size={22} />} title={copy.groupTitle} body={copy.groupBody} steps={[copy.browser, copy.keyWraps, copy.chain, copy.recipient]} />
           <div className="lg:col-span-2">
-            <FlowCard icon={<Coins size={22} />} title={copy.bulkTitle} body={copy.bulkBody} steps={[copy.approve, copy.rows, copy.batch, copy.recipients]} accent="amber" />
+            <FlowCard icon={<Coins size={22} />} title={copy.bulkTitle} body={copy.bulkBody} steps={[copy.approve, copy.rows, copy.batch, copy.recipients]} />
           </div>
         </section>
 
@@ -110,30 +110,23 @@ export function HowItWorks() {
 
         <footer className="flex flex-col items-center justify-between gap-3 border-t border-zinc-800 py-6 text-xs text-zinc-500 sm:flex-row">
           <span>Arcanum Private Messaging Protocol · Arc Testnet</span>
-          <Link href="/" className="inline-flex items-center gap-2 text-emerald-200">{copy.back}<ArrowRight size={13} /></Link>
+          <Link href="/" className="text-accent inline-flex items-center gap-2">{copy.back}<ArrowRight size={13} /></Link>
         </footer>
       </div>
     </main>
   );
 }
 
-function FlowCard({ icon, title, body, steps, accent }: { icon: ReactNode; title: string; body: string; steps: readonly string[]; accent: 'emerald' | 'sky' | 'violet' | 'amber' }) {
-  const accentClass = {
-    emerald: 'border-emerald-400/25 bg-emerald-400/10 text-emerald-200',
-    sky: 'border-sky-300/25 bg-sky-300/10 text-sky-200',
-    violet: 'border-violet-300/25 bg-violet-300/10 text-violet-200',
-    amber: 'border-amber-300/25 bg-amber-300/10 text-amber-200',
-  }[accent];
-
+function FlowCard({ icon, title, body, steps }: { icon: ReactNode; title: string; body: string; steps: readonly string[] }) {
   return (
     <article className="panel h-full">
-      <div className={`inline-flex h-11 w-11 items-center justify-center rounded-lg border ${accentClass}`}>{icon}</div>
+      <div className="badge-accent inline-flex h-11 w-11 items-center justify-center rounded-lg border">{icon}</div>
       <h2 className="mt-5 text-xl font-semibold text-white">{title}</h2>
       <p className="mt-3 text-sm leading-7 text-zinc-400">{body}</p>
       <div className="mt-6 flex flex-wrap items-center gap-2">
         {steps.map((step, index) => (
           <div key={step} className="contents">
-            <span className="rounded-full border border-zinc-800 bg-black/30 px-3 py-1.5 text-xs text-zinc-300">{step}</span>
+            <span className="rounded-full border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-xs text-zinc-300">{step}</span>
             {index < steps.length - 1 ? <ArrowRight size={13} className="text-zinc-600" /> : null}
           </div>
         ))}
