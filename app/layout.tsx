@@ -3,8 +3,14 @@ import './globals.css';
 import { Providers } from './providers';
 
 export const metadata: Metadata = {
-  title: 'Arcanum',
-  description: 'Private on-chain messaging on Arc Network',
+  title: {
+    default: 'Arcanum',
+    template: '%s · Arcanum',
+  },
+  description: 'Private communication and settlement on Arc Network',
+  icons: {
+    icon: '/arcanum-mark.svg',
+  },
 };
 
 const themeInitScript = `
