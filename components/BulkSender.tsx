@@ -7,6 +7,7 @@ import { useAccount, useBalance, useChainId, usePublicClient, useWaitForTransact
 import { arcNetworkTestnet, transactionUrl } from '../lib/chain';
 import { arcanumBulkSenderAbi, arcanumBulkSenderAddress, isArcanumBulkSenderConfigured } from '../lib/bulkContract';
 import type { Language } from './arcanumCopy';
+import { Modal } from './ui';
 
 type Row = { id: number; address: string; amount: string };
 type PreparedRow = { address: `0x${string}`; amount: bigint };
@@ -205,7 +206,7 @@ export default function BulkSender({ language }: { language: Language }) {
       ) : null}
 
       <form onSubmit={openReview} className="mt-5 grid gap-5">
-        <div className="rounded-xl border border-zinc-800 bg-black/20 p-3 sm:p-4">
+        <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 sm:p-4">
           <div className="grid gap-3">
             {rows.map((row, index) => (
               <div key={row.id} className="grid gap-2 sm:grid-cols-[32px_minmax(0,1fr)_180px_40px] sm:items-center">
@@ -224,7 +225,7 @@ export default function BulkSender({ language }: { language: Language }) {
         </div>
 
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="rounded-xl border border-zinc-800 bg-black/20 p-4">
+          <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
             <label className="grid gap-2"><span className="text-xs font-medium text-zinc-400">{copy.paste}</span><textarea value={paste} onChange={(event) => setPaste(event.target.value)} className="input min-h-28 resize-y py-3 font-mono text-xs" placeholder="0x123…,1.5\n0x456…,2" /></label>
             <button type="button" onClick={() => applyImported()} disabled={!paste.trim()} className="btn-ghost mt-3 h-10 px-3">{copy.apply}</button>
           </div>
@@ -239,7 +240,7 @@ export default function BulkSender({ language }: { language: Language }) {
       </form>
 
       {reviewOpen ? (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label={copy.reviewTitle}>
+        <Modal label={copy.reviewTitle} onClose={() => setReviewOpen(false)} closeDisabled={walletPending || receipt.isLoading}>
           <div className="modal-panel">
             <div className="flex items-start justify-between gap-3"><div><p className="eyebrow">{copy.eyebrow}</p><h3 className="mt-2 text-xl font-semibold text-white">{copy.reviewTitle}</h3></div><button type="button" onClick={() => setReviewOpen(false)} className="btn-ghost h-9 w-9" aria-label={copy.close}><X size={16} /></button></div>
             <div className="mt-5 grid gap-3 rounded-lg border border-zinc-800 bg-zinc-950 p-4">
@@ -251,7 +252,7 @@ export default function BulkSender({ language }: { language: Language }) {
             {error ? <div className="helper-danger mt-3">{error}</div> : null}
             <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><button type="button" onClick={() => setReviewOpen(false)} disabled={walletPending || receipt.isLoading} className="btn-ghost h-10 px-4">{copy.cancel}</button><button type="button" onClick={() => void confirmBatch()} disabled={walletPending || receipt.isLoading} className="btn-primary h-10 px-4">{walletPending || receipt.isLoading ? <Loader2 size={15} className="animate-spin" /> : <WalletCards size={15} />}{copy.confirm}</button></div>
           </div>
-        </div>
+        </Modal>
       ) : null}
     </section>
   );

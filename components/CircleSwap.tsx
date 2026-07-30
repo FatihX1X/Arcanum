@@ -614,7 +614,7 @@ export default function CircleSwap({ language }: { language: Language }) {
           </div>
         </div>
 
-        <div className="grid gap-3 rounded-lg border border-zinc-800 bg-zinc-950/50 p-4 text-sm">
+        <div className="grid gap-3 rounded-lg border border-zinc-800 bg-zinc-950 p-4 text-sm">
           <div className="flex items-center justify-between gap-3">
             <span className="text-zinc-500">{t.slippage}</span>
             <select
