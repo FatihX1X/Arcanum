@@ -1,41 +1,25 @@
 'use client';
 
-import Image from 'next/image';
-import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   AlertTriangle,
   Archive,
-  ArrowLeftRight,
-  BookOpen,
-  Bot,
+  ArrowLeft,
   CheckCircle2,
   Clock3,
   Download,
   ExternalLink,
   FileKey2,
   HelpCircle,
-  History,
   Info,
   KeyRound,
-  Layers3,
-  Languages,
   Lock,
-  Menu,
-  MessageCircle,
-  Moon,
-  Github,
   RefreshCw,
   Search,
   Send,
   Shield,
-  ShieldCheck,
-  Sun,
   Upload,
-  UsersRound,
-  Wallet,
-  Wifi,
   X,
 } from 'lucide-react';
 import {
@@ -74,7 +58,15 @@ import AgentMessages from './AgentMessages';
 import BulkSender from './BulkSender';
 import GroupMessages from './GroupMessages';
 import ArcanumEscrow from './ArcanumEscrow';
+import {
+  AppFooter as ShellFooter,
+  AppHeader as ShellHeader,
+  AppSidebar as ShellSidebar,
+  type AppView,
+  type ThemeMode,
+} from './AppChrome';
 import { copy, type Language } from './arcanumCopy';
+import { Badge, EmptyState, Modal, cx } from './ui';
 
 const CircleSwap = dynamic(() => import('./CircleSwap'), {
   ssr: false,
@@ -89,16 +81,14 @@ const ArcanumHistory = dynamic(() => import('./ArcanumHistory'), {
   ssr: false,
   loading: () => (
     <section className="panel flex min-h-[680px] items-center justify-center">
-      <RefreshCw size={20} className="animate-spin text-violet-300" />
+      <RefreshCw size={20} className="text-accent animate-spin" />
     </section>
   ),
 });
 
 type PrivacyMode = 'private' | 'public';
-type AppView = 'dm' | 'groups' | 'bulk' | 'swap' | 'agents' | 'escrow' | 'history' | 'about' | 'faq';
 type KeyModalMode = 'unlock' | 'register' | 'export' | 'import' | null;
 type TransactionStep = 'idle' | 'preparing' | 'wallet' | 'pending' | 'success' | 'error';
-type ThemeMode = 'light' | 'dark';
 type EthereumProvider = {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
 };
@@ -112,9 +102,6 @@ type Conversation = {
   messages: ChainMessage[];
   latest: ChainMessage;
 };
-
-const xProfileUrl = 'https://x.com/0xFatih';
-const githubRepoUrl = 'https://github.com/FatihX1X/Arcanum';
 
 function short(address: string) {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
@@ -280,7 +267,8 @@ export default function WalletConnect() {
     !recipientSelf &&
     trimmedMessage.length > 0 &&
     !isWritePending;
-  const txUrl = transactionUrl(lastHash ?? pendingHash ?? '');
+  const activeHash = lastHash ?? pendingHash;
+  const txUrl = activeHash ? transactionUrl(activeHash) : undefined;
   const errors = [flowError, connectError?.message, switchError?.message, writeError?.message, receipt.error?.message].filter(Boolean) as string[];
 
   const refreshLocalKeyStatus = useCallback(() => {
@@ -605,7 +593,7 @@ export default function WalletConnect() {
 
   return (
     <div className="app-shell">
-      <AppHeader
+      <ShellHeader
         t={t}
         language={language}
         isConnected={isConnected}
@@ -623,9 +611,10 @@ export default function WalletConnect() {
       />
 
       {menuOpen ? (
-        <div className="lg:hidden">
-          <AppSidebar
+        <div className="mobile-sidebar-layer lg:hidden">
+          <ShellSidebar
             t={t}
+            language={language}
             view={view}
             isConnected={isConnected}
             isCorrectChain={isCorrectChain}
@@ -646,10 +635,11 @@ export default function WalletConnect() {
 
       {!isArcanumMessengerConfigured ? <Empty title={t.common.unavailable} body={arcanumMessengerAddress} /> : null}
 
-      <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+      <div className="app-workspace">
         <div className="hidden lg:block">
-          <AppSidebar
+          <ShellSidebar
             t={t}
+            language={language}
             view={view}
             isConnected={isConnected}
             isCorrectChain={isCorrectChain}
@@ -739,219 +729,8 @@ export default function WalletConnect() {
         onSubmit={runKeyModalAction}
       />
 
-      <AppFooter />
+      <ShellFooter />
     </div>
-  );
-}
-
-function AppHeader({
-  t,
-  language,
-  isConnected,
-  address,
-  isCorrectChain,
-  isConnectPending,
-  isSwitchPending,
-  menuOpen,
-  connectorReady,
-  onMenu,
-  onLanguage,
-  onConnect,
-  onDisconnect,
-  onSwitch,
-}: {
-  t: (typeof copy)[Language];
-  language: Language;
-  isConnected: boolean;
-  address?: `0x${string}`;
-  isCorrectChain: boolean;
-  isConnectPending: boolean;
-  isSwitchPending: boolean;
-  menuOpen: boolean;
-  connectorReady: boolean;
-  onMenu: () => void;
-  onLanguage: () => void;
-  onConnect: () => void;
-  onDisconnect: () => void;
-  onSwitch: () => void;
-}) {
-  return (
-    <header className="surface px-4 py-3">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex min-w-0 items-center gap-3">
-          <button type="button" onClick={onMenu} className="btn-ghost h-10 w-10 lg:hidden" aria-label={menuOpen ? t.header.close : t.header.menu}>
-            {menuOpen ? <X size={18} /> : <Menu size={18} />}
-          </button>
-          <Image
-            src="/arcanum-logo.png"
-            alt="Arcanum logo"
-            width={160}
-            height={44}
-            className="h-9 w-28 object-contain sm:h-11 sm:w-40"
-            priority
-          />
-          <div className="min-w-0">
-            <p className="truncate text-xs text-zinc-500">{t.header.tagline}</p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <button type="button" onClick={onLanguage} className="btn-ghost h-9 px-3 text-xs">
-            <Languages size={14} />
-            {language.toUpperCase()}
-          </button>
-          {!isCorrectChain && isConnected ? (
-            <>
-              <Pill tone="warning" icon={<Wifi size={13} />} label={t.header.wrong} />
-              <button type="button" onClick={onSwitch} disabled={isSwitchPending} className="btn-ghost h-9 px-3 text-xs">
-                {isSwitchPending ? t.header.switching : t.header.switch}
-              </button>
-            </>
-          ) : null}
-          <Pill tone="info" label={`${t.header.contract} ${short(arcanumMessengerAddress)}`} />
-          {isConnected && address ? (
-            <button type="button" onClick={onDisconnect} className="btn-ghost h-9 px-3 text-xs" title={t.header.disconnect}>
-              <Wallet size={14} />
-              {short(address)}
-            </button>
-          ) : (
-            <button type="button" onClick={onConnect} disabled={!connectorReady || isConnectPending} className="btn-primary h-9 px-3 text-xs">
-              <Wallet size={14} />
-              {isConnectPending ? t.header.connecting : t.header.connect}
-            </button>
-          )}
-        </div>
-      </div>
-    </header>
-  );
-}
-
-function AppFooter() {
-  return (
-    <footer className="surface flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-xs text-zinc-500">Arcanum Private Messaging Protocol</p>
-      <div className="flex flex-wrap items-center gap-2">
-        <a href={xProfileUrl} target="_blank" rel="noreferrer" className="btn-ghost h-9 px-3 text-xs">
-          <span className="font-semibold">X</span>
-          0xFatih
-        </a>
-        <a href={githubRepoUrl} target="_blank" rel="noreferrer" className="btn-ghost h-9 px-3 text-xs">
-          <Github size={14} />
-          GitHub
-        </a>
-      </div>
-    </footer>
-  );
-}
-
-function AppSidebar({
-  t,
-  view,
-  isConnected,
-  isCorrectChain,
-  address,
-  messageCount,
-  hasOwnKey,
-  hasLocalKey,
-  localUnlocked,
-  theme,
-  onView,
-  onKeyCenter,
-  onTheme,
-}: {
-  t: (typeof copy)[Language];
-  view: AppView;
-  isConnected: boolean;
-  isCorrectChain: boolean;
-  address?: `0x${string}`;
-  messageCount: number;
-  hasOwnKey: boolean;
-  hasLocalKey: boolean;
-  localUnlocked: boolean;
-  theme: ThemeMode;
-  onView: (view: AppView) => void;
-  onKeyCenter: () => void;
-  onTheme: (theme: ThemeMode) => void;
-}) {
-  const items: Array<{ view: AppView; label: string; icon: ReactNode }> = [
-    { view: 'dm', label: t.nav.dm, icon: <MessageCircle size={16} /> },
-    { view: 'groups', label: t.nav.groups, icon: <UsersRound size={16} /> },
-    { view: 'bulk', label: t.nav.bulk, icon: <Layers3 size={16} /> },
-    { view: 'swap', label: t.nav.swap, icon: <ArrowLeftRight size={16} /> },
-    { view: 'agents', label: t.nav.agents, icon: <Bot size={16} /> },
-    { view: 'escrow', label: t.nav.escrow, icon: <ShieldCheck size={16} /> },
-    { view: 'history', label: t.nav.history, icon: <History size={16} /> },
-    { view: 'about', label: t.nav.about, icon: <Info size={16} /> },
-    { view: 'faq', label: t.nav.faq, icon: <HelpCircle size={16} /> },
-  ];
-
-  return (
-    <aside className="surface flex min-h-[640px] flex-col p-3">
-      <div className="border-b border-zinc-800 px-2 pb-3">
-        <p className="eyebrow">{t.sidebar.protocol}</p>
-        <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-          <Metric label={t.sidebar.wallet} value={isConnected && address ? short(address) : t.common.disconnectedShort} />
-          <Metric label={t.sidebar.messages} value={String(messageCount)} />
-        </div>
-      </div>
-
-      <nav className="mt-3 grid gap-1">
-        {items.map((item) => (
-          <button key={item.view} type="button" onClick={() => onView(item.view)} className={`nav-item ${view === item.view ? 'nav-item-active' : 'nav-item-idle'}`}>
-            {item.icon}
-            <span className="truncate">{item.label}</span>
-          </button>
-        ))}
-        <Link href="/how-it-works" className="nav-item nav-item-idle">
-          <BookOpen size={16} />
-          <span className="truncate">{t.nav.how}</span>
-        </Link>
-      </nav>
-
-      <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-950 p-3">
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <p className="text-xs font-medium text-zinc-500">{t.sidebar.security}</p>
-            <h2 className="mt-1 text-sm font-semibold text-zinc-100">{t.sidebar.keyCenter}</h2>
-          </div>
-          <KeyRound size={18} className={hasOwnKey && hasLocalKey && localUnlocked ? 'text-emerald-300' : 'text-amber-300'} />
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Pill tone={hasOwnKey ? 'success' : 'warning'} label={hasOwnKey ? t.key.ok : t.key.needed} />
-          <Pill tone={hasLocalKey && localUnlocked ? 'success' : 'warning'} label={hasLocalKey ? (localUnlocked ? t.key.localReady : t.key.locked) : t.key.noLocal} />
-        </div>
-        <button type="button" onClick={onKeyCenter} disabled={!isConnected || !isCorrectChain} className="btn-ghost mt-3 h-9 w-full px-3 text-xs">
-          <FileKey2 size={14} />
-          {t.sidebar.openKeyCenter}
-        </button>
-      </div>
-
-      <div className="theme-control mt-auto">
-        <p className="px-1 text-xs font-medium text-zinc-500">{t.sidebar.theme}</p>
-        <div className="theme-switch" role="group" aria-label={t.sidebar.theme}>
-          <button
-            type="button"
-            onClick={() => onTheme('light')}
-            className={`theme-option ${theme === 'light' ? 'theme-option-active' : ''}`}
-            aria-pressed={theme === 'light'}
-            title={t.sidebar.lightTheme}
-          >
-            <Sun size={15} />
-            <span>{t.sidebar.light}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => onTheme('dark')}
-            className={`theme-option ${theme === 'dark' ? 'theme-option-active' : ''}`}
-            aria-pressed={theme === 'dark'}
-            title={t.sidebar.darkTheme}
-          >
-            <Moon size={15} />
-            <span>{t.sidebar.dark}</span>
-          </button>
-        </div>
-      </div>
-    </aside>
   );
 }
 
@@ -1027,50 +806,55 @@ function DirectMessagesView({
   onKeyModal: (mode: Exclude<KeyModalMode, null>) => void;
 }) {
   return (
-    <section className="grid min-w-0 gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
-      <ConversationList
-        t={t}
-        language={language}
-        isConnected={isConnected}
-        isCorrectChain={isCorrectChain}
-        conversations={conversations}
-        allConversationCount={allConversationCount}
-        activeRecipient={activeRecipient}
-        search={conversationSearch}
-        newRecipient={newRecipient}
-        pendingRecipient={pendingRecipient}
-        pendingHash={pendingHash}
-        isFetching={inboxFetching || sentFetching}
-        onSearch={onSearch}
-        onRecipient={onRecipient}
-        onSelect={onSelect}
-        onRefresh={onRefresh}
-      />
+    <section className="communication-layout">
+      <div className={recipientValid ? 'hidden min-w-0 xl:block' : 'min-w-0'}>
+        <ConversationList
+          t={t}
+          language={language}
+          isConnected={isConnected}
+          isCorrectChain={isCorrectChain}
+          conversations={conversations}
+          allConversationCount={allConversationCount}
+          activeRecipient={activeRecipient}
+          search={conversationSearch}
+          newRecipient={newRecipient}
+          pendingRecipient={pendingRecipient}
+          pendingHash={pendingHash}
+          isFetching={inboxFetching || sentFetching}
+          onSearch={onSearch}
+          onRecipient={onRecipient}
+          onSelect={onSelect}
+          onRefresh={onRefresh}
+        />
+      </div>
 
-      <ChatPanel
-        t={t}
-        language={language}
-        isConnected={isConnected}
-        isCorrectChain={isCorrectChain}
-        viewer={address}
-        activeRecipient={activeRecipient}
-        recipientValid={recipientValid}
-        recipientSelf={recipientSelf}
-        messages={activeMessages}
-        privacy={privacy}
-        message={message}
-        isWritePending={isWritePending}
-        canSend={canSend}
-        privateRecipientMissing={privateRecipientMissing}
-        hasOwnKey={hasOwnKey}
-        hasLocalKey={hasLocalKey}
-        localUnlocked={localUnlocked}
-        recipientHasKey={recipientHasKey}
-        onMessage={onMessage}
-        onPrivacy={onPrivacy}
-        onSubmit={onSubmit}
-        onKeyModal={onKeyModal}
-      />
+      <div className={!recipientValid ? 'hidden min-w-0 xl:block' : 'min-w-0'}>
+        <ChatPanel
+          t={t}
+          language={language}
+          isConnected={isConnected}
+          isCorrectChain={isCorrectChain}
+          viewer={address}
+          activeRecipient={activeRecipient}
+          recipientValid={recipientValid}
+          recipientSelf={recipientSelf}
+          messages={activeMessages}
+          privacy={privacy}
+          message={message}
+          isWritePending={isWritePending}
+          canSend={canSend}
+          privateRecipientMissing={privateRecipientMissing}
+          hasOwnKey={hasOwnKey}
+          hasLocalKey={hasLocalKey}
+          localUnlocked={localUnlocked}
+          recipientHasKey={recipientHasKey}
+          onBack={() => onRecipient('')}
+          onMessage={onMessage}
+          onPrivacy={onPrivacy}
+          onSubmit={onSubmit}
+          onKeyModal={onKeyModal}
+        />
+      </div>
     </section>
   );
 }
@@ -1173,7 +957,7 @@ function ConversationButton({
   onClick: () => void;
 }) {
   return (
-    <button type="button" onClick={onClick} className={`chat-card p-3 text-left ${active ? 'border-emerald-400/40 bg-emerald-400/10' : ''}`}>
+    <button type="button" onClick={onClick} className={`chat-card p-3 text-left ${active ? 'is-active' : ''}`} aria-current={active}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate font-mono text-sm text-zinc-100">{short(conversation.address)}</p>
@@ -1209,6 +993,7 @@ function ChatPanel({
   hasLocalKey,
   localUnlocked,
   recipientHasKey,
+  onBack,
   onMessage,
   onPrivacy,
   onSubmit,
@@ -1232,6 +1017,7 @@ function ChatPanel({
   hasLocalKey: boolean;
   localUnlocked: boolean;
   recipientHasKey: boolean;
+  onBack: () => void;
   onMessage: (value: string) => void;
   onPrivacy: (value: PrivacyMode) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
@@ -1242,10 +1028,15 @@ function ChatPanel({
   return (
     <section className="panel flex min-h-[680px] min-w-0 flex-col">
       <div className="panel-header">
-        <div className="min-w-0">
+        <div className="flex min-w-0 items-start gap-2">
+          <button type="button" onClick={onBack} className="btn-ghost h-10 w-10 shrink-0 xl:hidden" aria-label={t.history.reply}>
+            <ArrowLeft size={17} />
+          </button>
+          <div className="min-w-0">
           <p className="eyebrow">{t.dm.selected}</p>
           <h2 className="panel-title truncate font-mono">{hasValidPeer ? short(activeRecipient) : t.dm.choose}</h2>
           {hasValidPeer ? <p className="mt-1 break-all text-xs text-zinc-500">{activeRecipient}</p> : null}
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Pill tone={hasOwnKey ? 'success' : 'warning'} icon={<KeyRound size={13} />} label={hasOwnKey ? t.key.ok : t.key.needed} />
@@ -1263,7 +1054,7 @@ function ChatPanel({
         </div>
       </div>
 
-      <div className="mt-4 flex min-h-[360px] flex-1 flex-col gap-3 overflow-y-auto rounded-lg border border-zinc-800 bg-black/30 p-3">
+      <div className="mt-4 flex min-h-[360px] flex-1 flex-col gap-3 overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-950 p-3">
         {isConnected && !isCorrectChain ? <Empty title={t.header.wrong} body={t.header.switch} /> : null}
         {isCorrectChain && !hasValidPeer ? <Empty title={t.dm.empty} body={t.dm.choose} /> : null}
         {isCorrectChain && hasValidPeer && messages.length === 0 ? <Empty title={t.dm.newConversation} body={t.dm.choose} /> : null}
@@ -1337,7 +1128,7 @@ function ChatComposer({
         className="input min-h-24 resize-none py-3 leading-6"
       />
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-        <div className="grid grid-cols-2 gap-2 rounded-lg border border-zinc-800 bg-zinc-950 p-1 xl:w-72">
+        <div className="segmented-control grid-cols-2 xl:w-72">
           <Tab active={privacy === 'private'} icon={<Lock size={16} />} label={t.composer.private} onClick={() => onPrivacy('private')} />
           <Tab active={privacy === 'public'} icon={<Shield size={16} />} label={t.composer.public} onClick={() => onPrivacy('public')} />
         </div>
@@ -1459,7 +1250,7 @@ function KeyCenterModal({
   }[mode];
 
   return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label={content.title}>
+    <Modal label={content.title} onClose={onClose} closeDisabled={pending}>
       <form onSubmit={onSubmit} className="modal-panel">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
@@ -1487,7 +1278,7 @@ function KeyCenterModal({
         </div>
 
         <div className="mt-5 grid gap-3">
-          <div className="grid grid-cols-2 gap-2 rounded-lg border border-zinc-800 bg-zinc-950 p-1">
+          <div className="segmented-control grid-cols-2">
             <Tab active={mode === 'unlock'} icon={<Lock size={15} />} label={t.key.unlock} onClick={() => onMode('unlock')} />
             <Tab active={mode === 'register'} icon={<KeyRound size={15} />} label={t.key.register} onClick={() => onMode('register')} />
             <Tab active={mode === 'export'} icon={<Download size={15} />} label={t.key.export} onClick={() => onMode('export')} />
@@ -1528,7 +1319,7 @@ function KeyCenterModal({
           </button>
         </div>
       </form>
-    </div>
+    </Modal>
   );
 }
 
@@ -1636,26 +1427,12 @@ function FaqPanel({ title, items }: { title: string; items: readonly (readonly [
 }
 
 function Empty({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-3">
-      <p className="text-sm font-medium text-zinc-200">{title}</p>
-      <p className="mt-1 break-words text-sm text-zinc-500">{body}</p>
-    </div>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg border border-zinc-800 bg-black/30 px-3 py-2">
-      <p className="text-[11px] text-zinc-500">{label}</p>
-      <p className="mt-1 truncate font-mono text-xs text-zinc-200">{value}</p>
-    </div>
-  );
+  return <EmptyState title={title} body={body} />;
 }
 
 function Tab({ active, icon, label, onClick }: { active: boolean; icon: ReactNode; label: string; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className={`inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium transition ${active ? 'bg-white text-zinc-950' : 'text-zinc-400 hover:bg-zinc-800'}`}>
+    <button type="button" onClick={onClick} className={cx('segment-option', active && 'segment-option-active')} aria-pressed={active}>
       {icon}
       <span className="truncate">{label}</span>
     </button>
@@ -1663,16 +1440,5 @@ function Tab({ active, icon, label, onClick }: { active: boolean; icon: ReactNod
 }
 
 function Pill({ tone, icon, label }: { tone: 'success' | 'warning' | 'info'; icon?: ReactNode; label: string }) {
-  const toneClass = {
-    success: 'border-emerald-400/25 bg-emerald-400/10 text-emerald-200',
-    warning: 'border-amber-300/25 bg-amber-300/10 text-amber-200',
-    info: 'border-sky-300/25 bg-sky-300/10 text-sky-200',
-  }[tone];
-
-  return (
-    <span className={`inline-flex min-w-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${toneClass}`}>
-      {icon}
-      <span className="truncate">{label}</span>
-    </span>
-  );
+  return <Badge tone={tone} icon={icon}>{label}</Badge>;
 }
