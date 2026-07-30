@@ -68,6 +68,7 @@ import {
 } from './AppChrome';
 import { copy, type Language } from './arcanumCopy';
 import { Badge, EmptyState, Modal, cx } from './ui';
+import BridgeErrorBoundary from './BridgeErrorBoundary';
 
 const CircleSwap = dynamic(() => import('./CircleSwap'), {
   ssr: false,
@@ -716,7 +717,11 @@ export default function WalletConnect() {
 
         {view === 'swap' ? <CircleSwap language={language} /> : null}
 
-        {view === 'bridge' ? <CircleBridge language={language} /> : null}
+        {view === 'bridge' ? (
+          <BridgeErrorBoundary language={language}>
+            <CircleBridge language={language} />
+          </BridgeErrorBoundary>
+        ) : null}
 
         {view === 'escrow' ? <ArcanumEscrow language={language} onOpenKeyCenter={() => openKeyModal(hasOwnKey ? (localKeyStored ? 'unlock' : 'import') : 'register')} /> : null}
 

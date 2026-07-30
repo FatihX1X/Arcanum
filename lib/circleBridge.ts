@@ -81,6 +81,23 @@ export function arcNativeGasWeiToTokenUnits(value: bigint) {
   return (value + 999_999_999_999n) / 1_000_000_000_000n;
 }
 
+export function bridgeGasFeeToNativeUnits(value: string, decimals = 18) {
+  const normalized = value.trim();
+  if (/^\d+$/.test(normalized)) return BigInt(normalized);
+  if (!/^\d+\.\d+$/.test(normalized) || decimals < 0) return null;
+
+  const [whole, fraction = ''] = normalized.split('.');
+  if (decimals === 0) {
+    return BigInt(whole) + (/[1-9]/.test(fraction) ? 1n : 0n);
+  }
+
+  const keptFraction = fraction.slice(0, decimals);
+  const discardedFraction = fraction.slice(decimals);
+  const base = BigInt(whole) * (10n ** BigInt(decimals))
+    + BigInt(keptFraction.padEnd(decimals, '0'));
+  return base + (/[1-9]/.test(discardedFraction) ? 1n : 0n);
+}
+
 export function arcBridgeMaxBalance(
   tokenBalance: bigint,
   estimatedGasReserve = fallbackArcBridgeGasReserve,

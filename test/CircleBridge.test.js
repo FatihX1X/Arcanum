@@ -25,6 +25,7 @@ function loadTypeScriptModule(relativePath) {
 describe('Circle Bridge safeguards', function () {
   const chains = loadTypeScriptModule('lib/bridgeChains.ts');
   const bridge = loadTypeScriptModule('lib/circleBridge.ts');
+  const rpcProxy = loadTypeScriptModule('lib/rpcProxy.ts');
   const account = '0x1111111111111111111111111111111111111111';
 
   it('exposes only EVM testnets and requires exactly one Arc endpoint', function () {
@@ -51,6 +52,29 @@ describe('Circle Bridge safeguards', function () {
     expect(bridge.bufferedBridgeGas(100_000n)).to.equal(120_000n);
     expect(bridge.arcNativeGasWeiToTokenUnits(100_000_000_000_001n)).to.equal(101n);
     expect(bridge.arcBridgeMaxBalance(10_000_000n, 100_000n)).to.equal(9_880_000n);
+  });
+
+  it('accepts both SDK integer gas units and decimal native gas amounts without crashing', function () {
+    expect(bridge.bridgeGasFeeToNativeUnits('1412500000000000', 18)).to.equal(1412500000000000n);
+    expect(bridge.bridgeGasFeeToNativeUnits('0.0014125', 18)).to.equal(1412500000000000n);
+    expect(bridge.bridgeGasFeeToNativeUnits('0.0000001', 6)).to.equal(1n);
+    expect(bridge.bridgeGasFeeToNativeUnits('not-a-fee', 18)).to.equal(null);
+  });
+
+  it('keeps browser RPC traffic on a whitelisted same-origin proxy', function () {
+    expect(rpcProxy.rpcProxyPath(5042002)).to.equal('/api/rpc/5042002');
+    expect(rpcProxy.isSafeJsonRpcPayload({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'eth_call',
+      params: [],
+    })).to.equal(true);
+    expect(rpcProxy.isSafeJsonRpcPayload({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'debug_traceTransaction',
+      params: [],
+    })).to.equal(false);
   });
 
   it('classifies route, wallet, gas, rate-limit, forwarder and partial failures', function () {

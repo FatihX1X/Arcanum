@@ -16,7 +16,14 @@ import {
   type BridgeResult,
   type EstimateResult,
 } from '@circle-fin/bridge-kit';
-import { formatUnits, parseAbi, zeroAddress, type EIP1193Provider } from 'viem';
+import {
+  createPublicClient,
+  formatUnits,
+  http,
+  parseAbi,
+  zeroAddress,
+  type EIP1193Provider,
+} from 'viem';
 import {
   useAccount,
   useBalance,
@@ -39,6 +46,7 @@ import {
   arcBridgeMaxBalance,
   arcNativeGasWeiToTokenUnits,
   assertBridgeEstimateIntegrity,
+  bridgeGasFeeToNativeUnits,
   bridgeErrorKind,
   bridgeEstimateDebounceMs,
   bridgeEstimateTtlMs,
@@ -59,6 +67,7 @@ import {
   type BridgeHistoryStep,
   type LocalBridgeHistoryRecord,
 } from '@/lib/history';
+import { rpcProxyPath } from '@/lib/rpcProxy';
 import type { Language } from './arcanumCopy';
 
 type BridgePhase =
@@ -82,6 +91,10 @@ const bridgeKit = new BridgeKit({ disableErrorReporting: true });
 function createBridgeBrowserAdapter(provider: EIP1193Provider) {
   return createViemAdapterFromProvider({
     provider,
+    getPublicClient: ({ chain }) => createPublicClient({
+      chain,
+      transport: http(rpcProxyPath(chain.id)),
+    }),
     capabilities: {
       addressContext: 'user-controlled',
       supportedChains: [...bridgeEvmTestnets],
@@ -271,7 +284,9 @@ export default function CircleBridge({ language }: { language: Language }) {
 
   const balance = tokenBalance ?? 0n;
   const sourceGasFee = quote?.estimate.gasFees.find((fee) => fee.blockchain === source.chain)?.fees?.fee;
-  const sourceGasUnits = sourceGasFee ? BigInt(sourceGasFee) : null;
+  const sourceGasUnits = sourceGasFee
+    ? bridgeGasFeeToNativeUnits(sourceGasFee, source.nativeCurrency.decimals)
+    : null;
   const arcGasReserve = sourceGasUnits ? arcNativeGasWeiToTokenUnits(sourceGasUnits) : undefined;
   const maxBalance = isArcBridgeSource(source) ? arcBridgeMaxBalance(balance, arcGasReserve) : balance;
   const inputUnits = parseSwapAmount(amount);
@@ -616,7 +631,10 @@ export default function CircleBridge({ language }: { language: Language }) {
                   ? gasRows.map((fee) => {
                     const gasChain = bridgeChainByKey.get(fee.blockchain as BridgeChainKey);
                     const decimals = gasChain?.nativeCurrency.decimals ?? 18;
-                    return `${fee.name}: ${fee.fees ? formatUnits(BigInt(fee.fees.fee), decimals) : '—'} ${fee.token}`;
+                    const gasUnits = fee.fees
+                      ? bridgeGasFeeToNativeUnits(fee.fees.fee, decimals)
+                      : null;
+                    return `${fee.name}: ${gasUnits != null ? formatUnits(gasUnits, decimals) : '—'} ${fee.token}`;
                   }).join(' · ')
                   : t.noFees}
               />

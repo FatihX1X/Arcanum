@@ -5,6 +5,7 @@ import { useState, type ReactNode } from 'react';
 import { WagmiProvider, createConfig, http } from 'wagmi';
 import { injected } from 'wagmi/connectors';
 import { bridgeWagmiChains } from '../lib/bridgeChains';
+import { rpcTransportUrl } from '../lib/rpcProxy';
 
 const config = createConfig({
   ssr: true,
@@ -16,7 +17,7 @@ const config = createConfig({
   ],
   transports: Object.fromEntries(bridgeWagmiChains.map((chain) => [
     chain.id,
-    http(chain.rpcUrls.default.http[0], {
+    http(rpcTransportUrl(chain.id, chain.rpcUrls.default.http[0]), {
       batch: { batchSize: 20, wait: 16 },
       retryCount: 4,
       retryDelay: 500,
