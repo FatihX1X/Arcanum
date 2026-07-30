@@ -13,6 +13,7 @@ import {
   Info,
   Languages,
   Layers3,
+  Milestone,
   Menu,
   MessageCircle,
   Moon,
@@ -28,7 +29,7 @@ import ArcanumBrand from './ArcanumBrand';
 import { copy, type Language } from './arcanumCopy';
 import { Badge, Button, IconButton, cx } from './ui';
 
-export type AppView = 'dm' | 'groups' | 'bulk' | 'swap' | 'agents' | 'escrow' | 'history' | 'about' | 'faq';
+export type AppView = 'dm' | 'groups' | 'bulk' | 'swap' | 'bridge' | 'agents' | 'escrow' | 'history' | 'about' | 'faq';
 export type ThemeMode = 'light' | 'dark';
 
 type Copy = (typeof copy)[Language];
@@ -48,6 +49,7 @@ export function AppHeader({
   isCorrectChain,
   isConnectPending,
   isSwitchPending,
+  networkLabel,
   menuOpen,
   connectorReady,
   onMenu,
@@ -63,6 +65,7 @@ export function AppHeader({
   isCorrectChain: boolean;
   isConnectPending: boolean;
   isSwitchPending: boolean;
+  networkLabel?: string;
   menuOpen: boolean;
   connectorReady: boolean;
   onMenu: () => void;
@@ -97,7 +100,7 @@ export function AppHeader({
           </>
         ) : (
           <Badge tone={isConnected ? 'success' : 'neutral'} icon={<span className="h-1.5 w-1.5 rounded-full bg-current" />} className="hidden sm:inline-flex">
-            {isConnected ? 'Arc Testnet' : t.common.disconnectedShort}
+            {isConnected ? (networkLabel ?? 'Arc Testnet') : t.common.disconnectedShort}
           </Badge>
         )}
 
@@ -200,6 +203,7 @@ export function AppSidebar({
       items: [
         { view: 'bulk', label: t.nav.bulk, icon: <Layers3 size={16} /> },
         { view: 'swap', label: t.nav.swap, icon: <ArrowLeftRight size={16} /> },
+        { view: 'bridge', label: t.nav.bridge, icon: <Milestone size={16} /> },
         { view: 'escrow', label: t.nav.escrow, icon: <ShieldCheck size={16} /> },
       ],
     },
