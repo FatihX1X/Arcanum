@@ -24,7 +24,6 @@ import {
   Wifi,
   X,
 } from 'lucide-react';
-import { arcanumMessengerAddress } from '../lib/contract';
 import ArcanumBrand from './ArcanumBrand';
 import { copy, type Language } from './arcanumCopy';
 import { Badge, Button, IconButton, cx } from './ui';
@@ -49,7 +48,6 @@ export function AppHeader({
   isCorrectChain,
   isConnectPending,
   isSwitchPending,
-  networkLabel,
   menuOpen,
   connectorReady,
   onMenu,
@@ -65,7 +63,6 @@ export function AppHeader({
   isCorrectChain: boolean;
   isConnectPending: boolean;
   isSwitchPending: boolean;
-  networkLabel?: string;
   menuOpen: boolean;
   connectorReady: boolean;
   onMenu: () => void;
@@ -98,15 +95,7 @@ export function AppHeader({
               {t.header.switch}
             </Button>
           </>
-        ) : (
-          <Badge tone={isConnected ? 'success' : 'neutral'} icon={<span className="h-1.5 w-1.5 rounded-full bg-current" />} className="hidden sm:inline-flex">
-            {isConnected ? (networkLabel ?? 'Arc Testnet') : t.common.disconnectedShort}
-          </Badge>
-        )}
-
-        <Badge tone="neutral" className="hidden 2xl:inline-flex">
-          {t.header.contract} {short(arcanumMessengerAddress)}
-        </Badge>
+        ) : null}
 
         {isConnected && address ? (
           <Button

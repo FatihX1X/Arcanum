@@ -610,7 +610,6 @@ export default function WalletConnect() {
         isConnected={isConnected}
         address={address}
         isCorrectChain={view === 'bridge' ? bridgeChainById.has(chainId) : isCorrectChain}
-        networkLabel={view === 'bridge' ? bridgeChainById.get(chainId)?.name : 'Arc Testnet'}
         isConnectPending={isConnectPending}
         isSwitchPending={isSwitchPending}
         menuOpen={menuOpen}
