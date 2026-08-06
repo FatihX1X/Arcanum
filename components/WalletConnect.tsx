@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   AlertTriangle,
   Archive,
@@ -1041,6 +1041,18 @@ function ChatPanel({
   onKeyModal: (mode: Exclude<KeyModalMode, null>) => void;
 }) {
   const hasValidPeer = recipientValid && !recipientSelf;
+  const messagesViewportRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const viewport = messagesViewportRef.current;
+    if (!viewport || messages.length === 0) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      viewport.scrollTop = viewport.scrollHeight;
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeRecipient, messages.length]);
 
   return (
     <section className="panel flex min-h-[680px] min-w-0 flex-col">
@@ -1071,7 +1083,7 @@ function ChatPanel({
         </div>
       </div>
 
-      <div className="mt-4 flex min-h-[360px] flex-1 flex-col gap-3 overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-950 p-3">
+      <div ref={messagesViewportRef} className="mt-4 flex min-h-[360px] max-h-[360px] flex-1 flex-col gap-3 overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-950 p-3">
         {isConnected && !isCorrectChain ? <Empty title={t.header.wrong} body={t.header.switch} /> : null}
         {isCorrectChain && !hasValidPeer ? <Empty title={t.dm.empty} body={t.dm.choose} /> : null}
         {isCorrectChain && hasValidPeer && messages.length === 0 ? <Empty title={t.dm.newConversation} body={t.dm.choose} /> : null}
