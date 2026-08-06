@@ -4,23 +4,25 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 import { WagmiProvider, createConfig, http } from 'wagmi';
 import { injected } from 'wagmi/connectors';
-import { arcNetworkTestnet } from '../lib/chain';
+import { bridgeWagmiChains } from '../lib/bridgeChains';
+import { rpcTransportUrl } from '../lib/rpcProxy';
 
 const config = createConfig({
   ssr: true,
-  chains: [arcNetworkTestnet],
+  chains: bridgeWagmiChains,
   connectors: [
     injected({
       shimDisconnect: true,
     }),
   ],
-  transports: {
-    [arcNetworkTestnet.id]: http(arcNetworkTestnet.rpcUrls.default.http[0], {
+  transports: Object.fromEntries(bridgeWagmiChains.map((chain) => [
+    chain.id,
+    http(rpcTransportUrl(chain.id, chain.rpcUrls.default.http[0]), {
       batch: { batchSize: 20, wait: 16 },
       retryCount: 4,
       retryDelay: 500,
     }),
-  },
+  ])),
 });
 
 export function Providers({ children }: { children: ReactNode }) {

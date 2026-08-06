@@ -10,6 +10,7 @@ import {
   Inbox,
   Layers3,
   Lock,
+  Milestone,
   RefreshCw,
   Search,
   Send,
@@ -17,7 +18,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { formatEther, type PublicClient } from 'viem';
-import { useAccount, useChainId, usePublicClient } from 'wagmi';
+import { useAccount, usePublicClient } from 'wagmi';
 
 import { arcanumAgentsAbi, arcanumAgentsAddress, type AgentMessage } from '@/lib/agentsContract';
 import { arcanumBulkSenderAbi, arcanumBulkSenderAddress } from '@/lib/bulkContract';
@@ -34,9 +35,11 @@ import {
 } from '@/lib/escrowContracts';
 import {
   filterHistory,
+  readLocalBridgeHistory,
   readLocalSwapHistory,
   sortAndDedupeHistory,
   type BulkHistoryItem,
+  type BridgeHistoryItem,
   type EscrowHistoryItem,
   type HistoryItem,
   type HistoryTab,
@@ -75,6 +78,9 @@ type HistoryCopy = {
   received: string;
   minimum: string;
   fees: string;
+  provider: string;
+  bridgeRoute: string;
+  bridgeSteps: string;
   roles: string;
   recipients: string;
   showRecipients: string;
@@ -87,7 +93,7 @@ const copy: Record<Language, HistoryCopy> = {
   en: {
     eyebrow: 'History',
     title: 'Activity history',
-    tabs: { all: 'All', incoming: 'Incoming', outgoing: 'Outgoing', swap: 'Swap', escrow: 'Escrow', bulk: 'Bulk Sender' },
+    tabs: { all: 'All', incoming: 'Incoming', outgoing: 'Outgoing', swap: 'Swap', bridge: 'Bridge', escrow: 'Escrow', bulk: 'Bulk Sender' },
     refresh: 'Refresh',
     search: 'Search address, content, hash or ID',
     loadMore: 'Load more',
@@ -113,6 +119,9 @@ const copy: Record<Language, HistoryCopy> = {
     received: 'Received',
     minimum: 'Minimum output',
     fees: 'Fees',
+    provider: 'Provider',
+    bridgeRoute: 'Route',
+    bridgeSteps: 'Transfer steps',
     roles: 'Roles',
     recipients: 'recipients',
     showRecipients: 'Show recipients',
@@ -123,7 +132,7 @@ const copy: Record<Language, HistoryCopy> = {
   tr: {
     eyebrow: 'Geçmiş',
     title: 'İşlem geçmişi',
-    tabs: { all: 'Genel', incoming: 'Gelen Mesaj', outgoing: 'Giden Mesaj', swap: 'Swap', escrow: 'Escrow', bulk: 'Bulk Sender' },
+    tabs: { all: 'Genel', incoming: 'Gelen Mesaj', outgoing: 'Giden Mesaj', swap: 'Swap', bridge: 'Bridge', escrow: 'Escrow', bulk: 'Bulk Sender' },
     refresh: 'Yenile',
     search: 'Adres, içerik, hash veya ID ara',
     loadMore: 'Daha fazla yükle',
@@ -149,6 +158,9 @@ const copy: Record<Language, HistoryCopy> = {
     received: 'Alınan',
     minimum: 'Minimum çıktı',
     fees: 'Ücretler',
+    provider: 'Sağlayıcı',
+    bridgeRoute: 'Rota',
+    bridgeSteps: 'Transfer adımları',
     roles: 'Roller',
     recipients: 'alıcı',
     showRecipients: 'Alıcıları göster',
@@ -370,9 +382,7 @@ async function loadSwaps(account: string, cursor?: string | null) {
 export default function ArcanumHistory({ language }: { language: Language }) {
   const t = copy[language];
   const { address: account, isConnected } = useAccount();
-  const chainId = useChainId();
   const client = usePublicClient({ chainId: arcNetworkTestnet.id });
-  const isCorrectChain = chainId === arcNetworkTestnet.id;
   const [tab, setTab] = useState<HistoryTab>('all');
   const [query, setQuery] = useState('');
   const [visible, setVisible] = useState(pageSize);
@@ -383,18 +393,19 @@ export default function ArcanumHistory({ language }: { language: Language }) {
   const [loadingMoreSwaps, setLoadingMoreSwaps] = useState(false);
 
   const refresh = useCallback(async () => {
-    if (!client || !account || !isConnected || !isCorrectChain) return;
+    if (!client || !account || !isConnected) return;
     setLoading(true);
     setWarning('');
     setVisible(pageSize);
     const localSwaps = readLocalSwapHistory(account);
+    const localBridges = readLocalBridgeHistory(account);
     const [messagesResult, bulkResult, escrowResult, swaps] = await Promise.all([
       loadMessages(client, account).then((value) => ({ value, error: null })).catch((error: unknown) => ({ value: [] as MessageHistoryItem[], error })),
       loadBulk(client, account).then((value) => ({ value, error: null })).catch((error: unknown) => ({ value: [] as BulkHistoryItem[], error })),
       loadEscrow(client, account).then((value) => ({ value, error: null })).catch((error: unknown) => ({ value: [] as EscrowHistoryItem[], error })),
       loadSwaps(account).then((value) => ({ value, error: null })).catch((error: unknown) => ({ value: null, error })),
     ]);
-    const next: HistoryItem[] = [...localSwaps];
+    const next: HistoryItem[] = [...localSwaps, ...localBridges];
     next.push(...messagesResult.value, ...bulkResult.value, ...escrowResult.value);
     if (swaps.value) {
       next.push(...swaps.value.items);
@@ -409,13 +420,27 @@ export default function ArcanumHistory({ language }: { language: Language }) {
     }
     setItems(sortAndDedupeHistory(next));
     setLoading(false);
-  }, [account, client, isConnected, isCorrectChain, t.arcscanUnavailable, t.partial, t.rpcLimited]);
+  }, [account, client, isConnected, t.arcscanUnavailable, t.partial, t.rpcLimited]);
 
   useEffect(() => {
     setItems([]);
     setSwapCursor(null);
-    if (isConnected && isCorrectChain && account) void refresh();
-  }, [account, isConnected, isCorrectChain, refresh]);
+    if (isConnected && account) void refresh();
+  }, [account, isConnected, refresh]);
+
+  useEffect(() => {
+    if (!account) return;
+    const onBridgeHistory = (event: Event) => {
+      const detail = (event as CustomEvent<{ address?: string }>).detail;
+      if (!detail?.address || detail.address.toLowerCase() !== account.toLowerCase()) return;
+      setItems((current) => sortAndDedupeHistory([
+        ...current.filter((item) => item.kind !== 'bridge'),
+        ...readLocalBridgeHistory(account),
+      ]));
+    };
+    window.addEventListener('arcanum:bridge-history-updated', onBridgeHistory);
+    return () => window.removeEventListener('arcanum:bridge-history-updated', onBridgeHistory);
+  }, [account]);
 
   const filtered = useMemo(() => filterHistory(items, tab, query), [items, query, tab]);
   const displayed = filtered.slice(0, visible);
@@ -424,6 +449,7 @@ export default function ArcanumHistory({ language }: { language: Language }) {
     incoming: filterHistory(items, 'incoming').length,
     outgoing: filterHistory(items, 'outgoing').length,
     swap: filterHistory(items, 'swap').length,
+    bridge: filterHistory(items, 'bridge').length,
     escrow: filterHistory(items, 'escrow').length,
     bulk: filterHistory(items, 'bulk').length,
   }), [items]);
@@ -448,6 +474,7 @@ export default function ArcanumHistory({ language }: { language: Language }) {
     { id: 'incoming', icon: <Inbox size={15} /> },
     { id: 'outgoing', icon: <Send size={15} /> },
     { id: 'swap', icon: <ArrowDownLeft size={15} /> },
+    { id: 'bridge', icon: <Milestone size={15} /> },
     { id: 'escrow', icon: <ShieldCheck size={15} /> },
     { id: 'bulk', icon: <Layers3 size={15} /> },
   ];
@@ -459,13 +486,13 @@ export default function ArcanumHistory({ language }: { language: Language }) {
           <p className="eyebrow">{t.eyebrow}</p>
           <h2 className="panel-title">{t.title}</h2>
         </div>
-        <button type="button" onClick={() => void refresh()} disabled={!isConnected || !isCorrectChain || loading} className="btn-ghost h-10 px-3">
+        <button type="button" onClick={() => void refresh()} disabled={!isConnected || loading} className="btn-ghost h-10 px-3">
           <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
           {t.refresh}
         </button>
       </div>
 
-      <div className="segmented-control mt-4 grid-cols-2 sm:grid-cols-3 xl:grid-cols-6">
+      <div className="segmented-control mt-4 grid-cols-2 sm:grid-cols-4 xl:grid-cols-7">
         {tabs.map((item) => (
           <button
             key={item.id}
@@ -490,10 +517,9 @@ export default function ArcanumHistory({ language }: { language: Language }) {
       </label>
 
       {!isConnected ? <Notice>{t.disconnected}</Notice> : null}
-      {isConnected && !isCorrectChain ? <Notice>{t.wrongNetwork}</Notice> : null}
       {loading ? <Notice>{t.loading}</Notice> : null}
       {warning && (tab === 'all' || (warning === t.arcscanUnavailable && tab === 'swap') || warning !== t.arcscanUnavailable) ? <Notice tone="warning">{warning}</Notice> : null}
-      {!loading && isConnected && isCorrectChain && filtered.length === 0 ? <Notice>{t.empty}</Notice> : null}
+      {!loading && isConnected && filtered.length === 0 ? <Notice>{t.empty}</Notice> : null}
 
       <div className="mt-4 grid gap-3">
         {displayed.map((item) => (
@@ -522,7 +548,7 @@ function HistoryCard({ item, account, language, t }: { item: HistoryItem; accoun
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <span className="text-accent mt-0.5 rounded-lg border border-zinc-800 bg-zinc-950 p-2">
-            {item.kind === 'message' ? (item.direction === 'incoming' ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />) : item.kind === 'swap' ? <ArrowDownLeft size={16} /> : item.kind === 'escrow' ? <ShieldCheck size={16} /> : <Layers3 size={16} />}
+            {item.kind === 'message' ? (item.direction === 'incoming' ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />) : item.kind === 'swap' ? <ArrowDownLeft size={16} /> : item.kind === 'bridge' ? <Milestone size={16} /> : item.kind === 'escrow' ? <ShieldCheck size={16} /> : <Layers3 size={16} />}
           </span>
           <div>
             <h3 className="text-sm font-semibold text-zinc-100"><CardTitle item={item} t={t} /></h3>
@@ -544,6 +570,7 @@ function HistoryCard({ item, account, language, t }: { item: HistoryItem; accoun
             {item.fees?.length ? <Detail label={t.fees} value={item.fees.join(' · ')} /> : null}
           </div>
         ) : null}
+        {item.kind === 'bridge' ? <BridgeDetails item={item} t={t} /> : null}
         {item.kind === 'escrow' ? (
           <div className="grid gap-2 text-sm sm:grid-cols-2">
             {item.escrowId ? <Detail label="Escrow ID" value={`#${item.escrowId}`} /> : null}
@@ -596,8 +623,51 @@ function HistoryCard({ item, account, language, t }: { item: HistoryItem; accoun
 function CardTitle({ item, t }: { item: HistoryItem; t: HistoryCopy }) {
   if (item.kind === 'message') return <>{item.channel === 'agent' ? t.agent : t.direct} · {item.direction === 'incoming' ? t.incoming : t.outgoing}</>;
   if (item.kind === 'swap') return <>{item.tokenIn} → {item.tokenOut}</>;
+  if (item.kind === 'bridge') return <>USDC · {item.sourceChain} → {item.destinationChain}</>;
   if (item.kind === 'escrow') return <>{item.action}</>;
   return <>Bulk Sender · #{item.batchId}</>;
+}
+
+function BridgeDetails({ item, t }: { item: BridgeHistoryItem; t: HistoryCopy }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div>
+      <div className="grid gap-2 text-sm sm:grid-cols-2">
+        <Detail label={t.amount} value={`${item.amount} USDC`} />
+        <Detail label={t.bridgeRoute} value={`${item.sourceChain} → ${item.destinationChain}`} />
+        <Detail label={t.provider} value={item.provider ?? 'Circle CCTP V2'} />
+        {item.fees?.length ? <Detail label={t.fees} value={item.fees.join(' · ')} /> : null}
+      </div>
+      {item.steps.length ? (
+        <>
+          <button type="button" onClick={() => setExpanded((value) => !value)} className="text-accent mt-3 flex items-center gap-2 text-xs font-medium">
+            {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            {t.bridgeSteps}
+          </button>
+          {expanded ? (
+            <div className="mt-3 grid gap-2">
+              {item.steps.map((step, index) => (
+                <div key={`${step.name}-${index}`} className="rounded-md bg-zinc-950 px-3 py-2 text-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-zinc-300">
+                      {step.name} · {step.state}{step.batched ? ' · batched' : ''}{step.forwarded ? ' · forwarded' : ''}
+                    </span>
+                    {step.explorerUrl ? (
+                      <a href={step.explorerUrl} target="_blank" rel="noreferrer" className="text-accent inline-flex items-center gap-1">
+                        Explorer <ExternalLink size={12} />
+                      </a>
+                    ) : null}
+                  </div>
+                  {step.txHash ? <p className="mt-1 break-all font-mono text-zinc-600">{step.txHash}</p> : null}
+                  {step.errorMessage ? <p className="mt-1 text-red-300">{step.errorMessage}</p> : null}
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </>
+      ) : null}
+    </div>
+  );
 }
 
 function MessageDetails({ item, account, t }: { item: MessageHistoryItem; account?: `0x${string}`; t: HistoryCopy }) {
