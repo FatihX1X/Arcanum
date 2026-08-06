@@ -9,6 +9,8 @@
     "lint": "eslint app components lib --max-warnings=0",
     "compile:contracts": "hardhat compile",
     "test:contracts": "hardhat test",
+    "test:agent-runner": "node --test test-agent-runner/ArcanumAgentRunner.test.js",
+    "arcanum-agent": "node scripts/arcanum-agent.js",
     "test:frontend": "hardhat test test/CryptoSecurity.test.js test/RpcResilience.test.js test/CircleSwap.test.js test/CircleBridge.test.js test/History.test.js",
     "deploy": "hardhat run scripts/deploy.js --network arcTestnet",
     "deploy:arc": "hardhat run scripts/deploy.js --network arcTestnet",
