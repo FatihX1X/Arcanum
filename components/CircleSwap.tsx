@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { EIP1193Provider } from 'viem';
-import { parseAbi, zeroAddress } from 'viem';
+import { createPublicClient, http, parseAbi, zeroAddress } from 'viem';
 import {
   useAccount,
   useChainId,
@@ -50,6 +50,7 @@ import {
   type SwapTokenSymbol,
 } from '../lib/circleSwap';
 import { saveLocalSwapHistory, updateLocalSwapStatus } from '../lib/history';
+import { rpcProxyPath } from '../lib/rpcProxy';
 import type { Language } from './arcanumCopy';
 
 type SwapPhase = 'idle' | 'quoting' | 'ready' | 'wallet' | 'pending' | 'success' | 'error';
@@ -90,6 +91,10 @@ function installCircleFetchProxy() {
 function createArcBrowserAdapter(provider: EIP1193Provider) {
   return createViemAdapterFromProvider({
     provider,
+    getPublicClient: ({ chain }) => createPublicClient({
+      chain,
+      transport: http(rpcProxyPath(chain.id)),
+    }),
     capabilities: {
       addressContext: 'user-controlled',
       supportedChains: [arcCircleChain],

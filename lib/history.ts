@@ -2,12 +2,12 @@ import { formatUnits } from 'viem';
 
 import { arcSwapChainId, arcSwapTokens, type SwapTokenSymbol } from './circleSwap';
 
-export type HistoryTab = 'all' | 'incoming' | 'outgoing' | 'swap' | 'escrow' | 'bulk';
+export type HistoryTab = 'all' | 'incoming' | 'outgoing' | 'swap' | 'bridge' | 'escrow' | 'bulk';
 export type HistoryStatus = 'confirmed' | 'pending' | 'failed' | 'estimated';
 
 type HistoryBase = {
   id: string;
-  kind: 'message' | 'swap' | 'escrow' | 'bulk';
+  kind: 'message' | 'swap' | 'bridge' | 'escrow' | 'bulk';
   timestamp: number;
   status: HistoryStatus;
   txHash?: `0x${string}`;
@@ -36,6 +36,30 @@ export type SwapHistoryItem = HistoryBase & {
   source: 'chain' | 'local';
 };
 
+export type BridgeHistoryStep = {
+  name: string;
+  state: string;
+  txHash?: `0x${string}`;
+  explorerUrl?: string;
+  forwarded?: boolean;
+  batched?: boolean;
+  errorMessage?: string;
+};
+
+export type BridgeHistoryItem = HistoryBase & {
+  kind: 'bridge';
+  bridgeId: string;
+  account: `0x${string}`;
+  amount: string;
+  sourceChain: string;
+  sourceChainId: number;
+  destinationChain: string;
+  destinationChainId: number;
+  provider?: string;
+  fees?: string[];
+  steps: BridgeHistoryStep[];
+};
+
 export type EscrowHistoryItem = HistoryBase & {
   kind: 'escrow';
   action: string;
@@ -62,6 +86,7 @@ export type BulkHistoryItem = HistoryBase & {
 export type HistoryItem =
   | MessageHistoryItem
   | SwapHistoryItem
+  | BridgeHistoryItem
   | EscrowHistoryItem
   | BulkHistoryItem;
 
@@ -71,6 +96,7 @@ export type LocalSwapHistoryRecord = Omit<SwapHistoryItem, 'id' | 'kind' | 'sour
 };
 
 const localHistoryPrefix = 'arcanum.history.v1';
+const localBridgeHistoryPrefix = 'arcanum.bridge.history.v1';
 
 export function swapHistoryStorageKey(chainId: number, address: string) {
   return `${localHistoryPrefix}:${chainId}:${address.toLowerCase()}`;
@@ -135,7 +161,65 @@ export function updateLocalSwapStatus(address: string, txHash: string, status: H
   }
 }
 
+export type LocalBridgeHistoryRecord = Omit<BridgeHistoryItem, 'id' | 'kind'>;
+
+export function bridgeHistoryStorageKey(address: string) {
+  return `${localBridgeHistoryPrefix}:${address.toLowerCase()}`;
+}
+
+export function localBridgeToItem(record: LocalBridgeHistoryRecord): BridgeHistoryItem {
+  return {
+    ...record,
+    id: `bridge:${record.bridgeId}`,
+    kind: 'bridge',
+  };
+}
+
+export function readLocalBridgeHistory(address: string): BridgeHistoryItem[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(bridgeHistoryStorageKey(address));
+    const parsed = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((item): item is LocalBridgeHistoryRecord => (
+        item
+        && typeof item.bridgeId === 'string'
+        && String(item.account).toLowerCase() === address.toLowerCase()
+        && typeof item.timestamp === 'number'
+        && typeof item.amount === 'string'
+        && typeof item.sourceChain === 'string'
+        && typeof item.destinationChain === 'string'
+        && Array.isArray(item.steps)
+      ))
+      .map(localBridgeToItem);
+  } catch {
+    return [];
+  }
+}
+
+export function saveLocalBridgeHistory(record: LocalBridgeHistoryRecord) {
+  if (typeof window === 'undefined') return;
+  const key = bridgeHistoryStorageKey(record.account);
+  let records: LocalBridgeHistoryRecord[] = [];
+  try {
+    const current = JSON.parse(window.localStorage.getItem(key) ?? '[]');
+    if (Array.isArray(current)) records = current;
+  } catch {
+    records = [];
+  }
+  const next = [
+    record,
+    ...records.filter((item) => item.bridgeId !== record.bridgeId),
+  ].slice(0, 100);
+  window.localStorage.setItem(key, JSON.stringify(next));
+  window.dispatchEvent(new CustomEvent('arcanum:bridge-history-updated', {
+    detail: { address: record.account },
+  }));
+}
+
 export function historyIdentity(item: HistoryItem) {
+  if (item.kind === 'bridge') return `bridge:${item.bridgeId}`;
   if (item.txHash) {
     const suffix = item.kind === 'message'
       ? item.messageId
@@ -154,7 +238,11 @@ export function sortAndDedupeHistory(items: HistoryItem[]) {
   for (const item of items) {
     const key = historyIdentity(item);
     const existing = unique.get(key);
-    if (!existing || (existing.kind === 'swap' && existing.source === 'local' && item.kind === 'swap' && item.source === 'chain')) {
+    if (
+      !existing
+      || (existing.kind === 'swap' && existing.source === 'local' && item.kind === 'swap' && item.source === 'chain')
+      || (existing.kind === 'bridge' && item.kind === 'bridge' && item.timestamp >= existing.timestamp)
+    ) {
       unique.set(key, item);
     }
   }
@@ -181,6 +269,9 @@ function historySearchText(item: HistoryItem) {
   }
   if (item.kind === 'swap') {
     return `${common} ${item.tokenIn} ${item.tokenOut} ${item.amountIn} ${item.amountOut}`.toLowerCase();
+  }
+  if (item.kind === 'bridge') {
+    return `${common} ${item.bridgeId} ${item.account} ${item.amount} ${item.sourceChain} ${item.destinationChain} ${item.provider ?? ''} ${item.steps.map((step) => `${step.name} ${step.state} ${step.txHash ?? ''}`).join(' ')}`.toLowerCase();
   }
   if (item.kind === 'bulk') {
     return `${common} ${item.batchId} ${item.sender} ${item.totalAmount} ${item.recipients.map((entry) => `${entry.address} ${entry.amount}`).join(' ')}`.toLowerCase();

@@ -145,4 +145,35 @@ describe('Unified Arcanum history', function () {
     expect(history.swapHistoryStorageKey(5042002, account.toUpperCase()))
       .to.equal(`arcanum.history.v1:5042002:${account}`);
   });
+
+  it('scopes Bridge history to the wallet and deduplicates by bridge ID', function () {
+    expect(history.bridgeHistoryStorageKey(account.toUpperCase()))
+      .to.equal(`arcanum.bridge.history.v1:${account}`);
+    const pending = {
+      id: 'bridge:route-1',
+      kind: 'bridge',
+      bridgeId: 'route-1',
+      account,
+      timestamp: 100,
+      status: 'pending',
+      amount: '1',
+      sourceChain: 'Arc Testnet',
+      sourceChainId: 5042002,
+      destinationChain: 'Ethereum Sepolia',
+      destinationChainId: 11155111,
+      steps: [],
+    };
+    const completed = {
+      ...pending,
+      id: 'bridge:route-1-updated',
+      timestamp: 200,
+      status: 'confirmed',
+      steps: [{ name: 'Mint', state: 'success' }],
+    };
+    const result = history.sortAndDedupeHistory([pending, completed]);
+    expect(result).to.have.length(1);
+    expect(result[0].status).to.equal('confirmed');
+    expect(history.filterHistory([completed], 'bridge')).to.deep.equal([completed]);
+    expect(history.filterHistory([completed], 'all', 'Ethereum Sepolia')).to.deep.equal([completed]);
+  });
 });

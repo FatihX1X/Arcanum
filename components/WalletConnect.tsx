@@ -34,6 +34,7 @@ import {
 } from 'wagmi';
 import { isAddress, zeroAddress } from 'viem';
 import { arcAddEthereumChainParams, arcNetworkTestnet, transactionUrl } from '../lib/chain';
+import { bridgeChainById } from '../lib/bridgeChains';
 import {
   arcanumMessengerAbi,
   arcanumMessengerAddress,
@@ -67,8 +68,18 @@ import {
 } from './AppChrome';
 import { copy, type Language } from './arcanumCopy';
 import { Badge, EmptyState, Modal, cx } from './ui';
+import BridgeErrorBoundary from './BridgeErrorBoundary';
 
 const CircleSwap = dynamic(() => import('./CircleSwap'), {
+  ssr: false,
+  loading: () => (
+    <section className="panel flex min-h-[680px] items-center justify-center">
+      <RefreshCw size={20} className="animate-spin text-emerald-300" />
+    </section>
+  ),
+});
+
+const CircleBridge = dynamic(() => import('./CircleBridge'), {
   ssr: false,
   loading: () => (
     <section className="panel flex min-h-[680px] items-center justify-center">
@@ -340,13 +351,13 @@ export default function WalletConnect() {
   }, [refreshLocalKeyStatus]);
 
   useEffect(() => {
-    if (!isConnected || !address || isCorrectChain || autoSwitchedFor === address) {
+    if (!isConnected || !address || isCorrectChain || view === 'bridge' || autoSwitchedFor === address) {
       return;
     }
 
     setAutoSwitchedFor(address);
     void switchToArc();
-  }, [address, autoSwitchedFor, isConnected, isCorrectChain, switchToArc]);
+  }, [address, autoSwitchedFor, isConnected, isCorrectChain, switchToArc, view]);
 
   useEffect(() => {
     if (!receipt.isSuccess) {
@@ -598,7 +609,7 @@ export default function WalletConnect() {
         language={language}
         isConnected={isConnected}
         address={address}
-        isCorrectChain={isCorrectChain}
+        isCorrectChain={view === 'bridge' ? bridgeChainById.has(chainId) : isCorrectChain}
         isConnectPending={isConnectPending}
         isSwitchPending={isSwitchPending}
         menuOpen={menuOpen}
@@ -704,6 +715,12 @@ export default function WalletConnect() {
         {view === 'bulk' ? <BulkSender language={language} /> : null}
 
         {view === 'swap' ? <CircleSwap language={language} /> : null}
+
+        {view === 'bridge' ? (
+          <BridgeErrorBoundary language={language}>
+            <CircleBridge language={language} />
+          </BridgeErrorBoundary>
+        ) : null}
 
         {view === 'escrow' ? <ArcanumEscrow language={language} onOpenKeyCenter={() => openKeyModal(hasOwnKey ? (localKeyStored ? 'unlock' : 'import') : 'register')} /> : null}
 
