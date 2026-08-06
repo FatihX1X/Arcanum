@@ -23,7 +23,6 @@ import {
   Wifi,
   X,
 } from 'lucide-react';
-import { arcanumMessengerAddress } from '../lib/contract';
 import ArcanumBrand from './ArcanumBrand';
 import { copy, type Language } from './arcanumCopy';
 import { Badge, Button, IconButton, cx } from './ui';
@@ -100,10 +99,6 @@ export function AppHeader({
             {isConnected ? 'Arc Testnet' : t.common.disconnectedShort}
           </Badge>
         )}
-
-        <Badge tone="neutral" className="hidden 2xl:inline-flex">
-          {t.header.contract} {short(arcanumMessengerAddress)}
-        </Badge>
 
         {isConnected && address ? (
           <Button
