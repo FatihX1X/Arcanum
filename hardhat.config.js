@@ -1,8 +1,13 @@
 require('@nomicfoundation/hardhat-toolbox');
 
-const arcRpcUrl = process.env.ARC_TESTNET_RPC_URL || process.env.NEXT_PUBLIC_RPC_URL || 'https://rpc.testnet.arc.network';
 const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY;
-const arcChainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID || process.env.ARC_TESTNET_CHAIN_ID || 5042002);
+const accounts = deployerPrivateKey ? [deployerPrivateKey] : [];
+
+const arcTestnetRpcUrl = process.env.ARC_TESTNET_RPC_URL || process.env.NEXT_PUBLIC_RPC_URL || 'https://rpc.testnet.arc.network';
+const arcTestnetChainId = Number(process.env.ARC_TESTNET_CHAIN_ID || 5042002);
+
+const arcMainnetRpcUrl = process.env.ARC_MAINNET_RPC_URL || 'https://rpc.mainnet.arc.io';
+const arcMainnetChainId = Number(process.env.ARC_MAINNET_CHAIN_ID || 5042);
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
@@ -18,22 +23,36 @@ module.exports = {
   networks: {
     hardhat: {},
     arcTestnet: {
-      url: arcRpcUrl,
-      chainId: arcChainId,
-      accounts: deployerPrivateKey ? [deployerPrivateKey] : [],
+      url: arcTestnetRpcUrl,
+      chainId: arcTestnetChainId,
+      accounts,
+    },
+    arcMainnet: {
+      url: arcMainnetRpcUrl,
+      chainId: arcMainnetChainId,
+      accounts,
     },
   },
   etherscan: {
     apiKey: {
       arcTestnet: 'blockscout',
+      arcMainnet: 'blockscout',
     },
     customChains: [
       {
         network: 'arcTestnet',
-        chainId: arcChainId,
+        chainId: arcTestnetChainId,
         urls: {
           apiURL: 'https://testnet.arcscan.app/api',
           browserURL: 'https://testnet.arcscan.app',
+        },
+      },
+      {
+        network: 'arcMainnet',
+        chainId: arcMainnetChainId,
+        urls: {
+          apiURL: 'https://explorer.arc.io/api',
+          browserURL: 'https://explorer.arc.io',
         },
       },
     ],

@@ -18,6 +18,8 @@
     "deploy:groups": "hardhat run scripts/deploy-groups.js --network arcTestnet",
     "deploy:bulk": "hardhat run scripts/deploy-bulk.js --network arcTestnet",
     "deploy:escrow": "hardhat run scripts/deploy-escrow.js --network arcTestnet",
+    "deploy:all": "hardhat run scripts/deploy-all.js --network arcTestnet",
+    "deploy:mainnet": "hardhat run scripts/deploy-all.js --network arcMainnet",
     "fees:balance": "hardhat run scripts/fees-balance.js --network arcTestnet",
     "fees:claim": "hardhat run scripts/fees-claim.js --network arcTestnet"
   },
