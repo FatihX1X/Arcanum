@@ -58,7 +58,10 @@ export function arcAddEthereumChainParams() {
   };
 }
 
-export function transactionUrl(hash: string, chain = arcNetwork) {
+export function transactionUrl(
+  hash: string,
+  chain: { blockExplorers?: { default: { url: string } } } = arcNetwork,
+) {
   const baseUrl = chain.blockExplorers?.default.url.replace(/\/$/, '');
   return baseUrl ? `${baseUrl}/tx/${hash}` : undefined;
 }
