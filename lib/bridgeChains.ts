@@ -1,70 +1,79 @@
 import {
-  ArbitrumSepolia,
-  ArcTestnet,
-  AvalancheFuji,
-  BaseSepolia,
-  CodexTestnet,
-  CronosTestnet,
-  EdgeTestnet,
-  EthereumSepolia,
-  HyperEVMTestnet,
-  InjectiveTestnet,
-  InkTestnet,
-  LineaSepolia,
-  MonadTestnet,
-  MorphTestnet,
-  OptimismSepolia,
-  PharosTestnet,
-  PlumeTestnet,
-  PolygonAmoy,
-  SeiTestnet,
-  SonicTestnet,
-  UnichainSepolia,
-  WorldChainSepolia,
-  XDCApothem,
+  Arbitrum,
+  Arc,
+  Avalanche,
+  Base,
+  Codex,
+  Cronos,
+  Edge,
+  Ethereum,
+  HyperEVM,
+  Injective,
+  Ink,
+  Linea,
+  Monad,
+  Morph,
+  Optimism,
+  Pharos,
+  Plasma,
+  Plume,
+  Polygon,
+  Sei,
+  Sonic,
+  Unichain,
+  WorldChain,
+  XDC,
+  XLayer,
 } from '@circle-fin/bridge-kit/chains';
 import { defineChain, type Chain } from 'viem';
 
-import { arcNetwork, arcNetworkTestnet } from './chain';
+import { arcNetwork } from './chain';
 
-export const bridgeEvmTestnets = [
-  ArcTestnet,
-  ArbitrumSepolia,
-  AvalancheFuji,
-  BaseSepolia,
-  CodexTestnet,
-  CronosTestnet,
-  EdgeTestnet,
-  EthereumSepolia,
-  HyperEVMTestnet,
-  InjectiveTestnet,
-  InkTestnet,
-  LineaSepolia,
-  MonadTestnet,
-  MorphTestnet,
-  OptimismSepolia,
-  PharosTestnet,
-  PlumeTestnet,
-  PolygonAmoy,
-  SeiTestnet,
-  SonicTestnet,
-  UnichainSepolia,
-  WorldChainSepolia,
-  XDCApothem,
+export const bridgeEvmChains = [
+  Arc,
+  Ethereum,
+  Base,
+  Arbitrum,
+  Optimism,
+  Polygon,
+  Avalanche,
+  Linea,
+  Unichain,
+  WorldChain,
+  Ink,
+  HyperEVM,
+  Monad,
+  Morph,
+  Sei,
+  Sonic,
+  Codex,
+  Cronos,
+  Edge,
+  Injective,
+  Pharos,
+  Plasma,
+  Plume,
+  XDC,
+  XLayer,
 ] as const;
 
-export type BridgeEvmTestnet = (typeof bridgeEvmTestnets)[number];
-export type BridgeChainKey = BridgeEvmTestnet['chain'];
+export type BridgeEvmChain = (typeof bridgeEvmChains)[number];
+export type BridgeChainKey = BridgeEvmChain['chain'];
 
-export const arcBridgeChain = ArcTestnet;
-export const defaultBridgeCounterpart = EthereumSepolia;
+/** @deprecated Use bridgeEvmChains — kept for call-site compatibility during the mainnet cutover. */
+export const bridgeEvmTestnets = bridgeEvmChains;
+/** @deprecated Use BridgeEvmChain */
+export type BridgeEvmTestnet = BridgeEvmChain;
+
+export const arcBridgeChain = Arc;
+export const defaultBridgeCounterpart = Ethereum;
 
 function explorerBase(explorerUrl: string) {
   return explorerUrl.replace(/\/tx\/\{hash\}\/?$/, '').replace(/\/$/, '');
 }
 
-function toViemChain(chain: BridgeEvmTestnet): Chain {
-  if (chain.chainId === arcNetworkTestnet.id) return arcNetworkTestnet;
+function toViemChain(chain: BridgeEvmChain): Chain {
+  if (chain.chainId === arcNetwork.id) return arcNetwork;
   return defineChain({
     id: chain.chainId,
     name: chain.name,
@@ -79,34 +88,31 @@ function toViemChain(chain: BridgeEvmTestnet): Chain {
         url: explorerBase(chain.explorerUrl),
       },
     },
-    testnet: true,
+    testnet: false,
   });
 }
 
-export const bridgeWagmiChains = [arcNetwork, ...bridgeEvmTestnets.map(toViemChain)] as [
-  Chain,
-  ...Chain[],
-];
+export const bridgeWagmiChains = bridgeEvmChains.map(toViemChain) as [Chain, ...Chain[]];
 
-export const bridgeChainById = new Map<number, BridgeEvmTestnet>(
-  bridgeEvmTestnets.map((chain) => [chain.chainId, chain]),
+export const bridgeChainById = new Map<number, BridgeEvmChain>(
+  bridgeEvmChains.map((chain) => [chain.chainId, chain]),
 );
 
-export const bridgeChainByKey = new Map<BridgeChainKey, BridgeEvmTestnet>(
-  bridgeEvmTestnets.map((chain) => [chain.chain, chain]),
+export const bridgeChainByKey = new Map<BridgeChainKey, BridgeEvmChain>(
+  bridgeEvmChains.map((chain) => [chain.chain, chain]),
 );
 
-export function bridgeDestinationsFor(source: BridgeEvmTestnet) {
+export function bridgeDestinationsFor(source: BridgeEvmChain) {
   if (source.chain !== arcBridgeChain.chain) return [arcBridgeChain];
-  return bridgeEvmTestnets.filter((chain) => (
+  return bridgeEvmChains.filter((chain) => (
     chain.chain !== arcBridgeChain.chain
     && chain.cctp?.forwarderSupported.destination === true
   ));
 }
 
 export function isSupportedArcBridgeRoute(
-  source: BridgeEvmTestnet,
-  destination: BridgeEvmTestnet,
+  source: BridgeEvmChain,
+  destination: BridgeEvmChain,
 ) {
   const exactlyOneArc = (
     source.chain === arcBridgeChain.chain
@@ -114,13 +120,13 @@ export function isSupportedArcBridgeRoute(
     destination.chain === arcBridgeChain.chain
   );
   return exactlyOneArc
-    && source.isTestnet
-    && destination.isTestnet
+    && !source.isTestnet
+    && !destination.isTestnet
     && source.type === 'evm'
     && destination.type === 'evm'
     && destination.cctp?.forwarderSupported.destination === true;
 }
 
-export function bridgeExplorerUrl(chain: BridgeEvmTestnet, hash: string) {
+export function bridgeExplorerUrl(chain: BridgeEvmChain, hash: string) {
   return chain.explorerUrl.replace('{hash}', hash);
 }

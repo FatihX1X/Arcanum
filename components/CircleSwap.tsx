@@ -28,7 +28,7 @@ import {
   getChainByEnum,
   type SwapEstimate,
 } from '@circle-fin/swap-kit';
-import { arcNetworkTestnet, transactionUrl } from '../lib/chain';
+import { arcNetwork, transactionUrl } from '../lib/chain';
 import {
   arcSwapTokens,
   assertSwapEstimateIntegrity,
@@ -64,7 +64,7 @@ const erc20BalanceAbi = parseAbi([
   'function balanceOf(address account) view returns (uint256)',
 ]);
 const swapKit = new SwapKit({ disableErrorReporting: true });
-const arcCircleChain = getChainByEnum(Blockchain.Arc_Testnet);
+const arcCircleChain = getChainByEnum(Blockchain.Arc);
 const slippageOptions = [10, 50, 100] as const;
 const circleFetchProxyFlag = '__arcanumCircleFetchProxyInstalled';
 
@@ -105,11 +105,11 @@ function createArcBrowserAdapter(provider: EIP1193Provider) {
 const swapCopy = {
   en: {
     title: 'Swap',
-    eyebrow: 'Circle Swap on Arc',
-    description: 'Swap USDC and EURC through Circle’s permissionless Arc Testnet route.',
+    eyebrow: 'Circle Swap on Arc Mainnet',
+    description: 'Swap USDC and EURC through Circle’s permissionless Arc mainnet route.',
     connected: 'Ready',
     disconnected: 'Connect your wallet to request a quote.',
-    wrongChain: 'Switch your wallet to Arc Testnet to continue.',
+    wrongChain: 'Switch your wallet to Arc mainnet to continue.',
     from: 'You pay',
     to: 'You receive',
     balance: 'Balance',
@@ -142,7 +142,7 @@ const swapCopy = {
     statusError: 'Action needed',
     errors: {
       rejected: 'The wallet request was rejected.',
-      'wrong-chain': 'The wallet is not connected to Arc Testnet.',
+      'wrong-chain': 'The wallet is not connected to Arc mainnet.',
       'wallet-provider': 'The connected wallet account could not be accessed. Reconnect the wallet and try again.',
       'service-unavailable': 'The Circle quote service could not be reached. Please retry in a moment.',
       'insufficient-balance': 'The wallet does not have enough token balance or native USDC for gas.',
@@ -154,11 +154,11 @@ const swapCopy = {
   },
   tr: {
     title: 'Swap',
-    eyebrow: 'Arc üzerinde Circle Swap',
-    description: 'USDC ve EURC’yi Circle’ın izinsiz Arc Testnet rotası üzerinden takas edin.',
+    eyebrow: 'Arc Mainnet üzerinde Circle Swap',
+    description: 'USDC ve EURC’yi Circle’ın izinsiz Arc mainnet rotası üzerinden takas edin.',
     connected: 'Hazır',
     disconnected: 'Fiyat almak için cüzdanınızı bağlayın.',
-    wrongChain: 'Devam etmek için cüzdanınızı Arc Testnet’e geçirin.',
+    wrongChain: 'Devam etmek için cüzdanınızı Arc mainnet’e geçirin.',
     from: 'Ödeyeceğiniz',
     to: 'Alacağınız',
     balance: 'Bakiye',
@@ -191,7 +191,7 @@ const swapCopy = {
     statusError: 'İşlem gerekli',
     errors: {
       rejected: 'Cüzdan isteği reddedildi.',
-      'wrong-chain': 'Cüzdan Arc Testnet’e bağlı değil.',
+      'wrong-chain': 'Cüzdan Arc mainnet’e bağlı değil.',
       'wallet-provider': 'Bağlı cüzdan hesabına erişilemedi. Cüzdanı yeniden bağlayıp tekrar deneyin.',
       'service-unavailable': 'Circle fiyat servisine erişilemedi. Kısa süre sonra tekrar deneyin.',
       'insufficient-balance': 'Token bakiyesi veya gas için native USDC yetersiz.',
@@ -225,7 +225,7 @@ export default function CircleSwap({ language }: { language: Language }) {
   const t = swapCopy[language];
   const { address, connector, isConnected } = useAccount();
   const chainId = useChainId();
-  const isCorrectChain = chainId === arcNetworkTestnet.id;
+  const isCorrectChain = chainId === arcNetwork.id;
   const adapterRef = useRef<{ account: string; adapter: BrowserAdapter } | null>(null);
   const requestIdRef = useRef(0);
 
@@ -257,7 +257,7 @@ export default function CircleSwap({ language }: { language: Language }) {
     query: { enabled: readsEnabled, refetchInterval: 15_000 },
   });
   const { data: gasPrice } = useGasPrice({
-    chainId: arcNetworkTestnet.id,
+    chainId: arcNetwork.id,
     query: { enabled: readsEnabled, refetchInterval: 15_000 },
   });
   const receipt = useWaitForTransactionReceipt({
@@ -292,12 +292,12 @@ export default function CircleSwap({ language }: { language: Language }) {
     && !busy,
   );
   const transactionHash = lastHash ?? pendingHash;
-  const txUrl = transactionHash ? transactionUrl(transactionHash, arcNetworkTestnet) : undefined;
+  const txUrl = transactionHash ? transactionUrl(transactionHash, arcNetwork) : undefined;
 
   const getAdapter = useCallback(async () => {
     if (!address) throw new Error('WALLET_NOT_CONNECTED');
     const connectorProvider = await connector?.getProvider({
-      chainId: arcNetworkTestnet.id,
+      chainId: arcNetwork.id,
     });
     if (
       !connectorProvider
@@ -329,7 +329,7 @@ export default function CircleSwap({ language }: { language: Language }) {
 
     const adapter = await getAdapter();
     const estimate = await swapKit.estimate({
-      from: { adapter, chain: SwapChain.Arc_Testnet },
+      from: { adapter, chain: SwapChain.Arc },
       tokenIn,
       tokenOut,
       amountIn: normalizedAmount,
@@ -451,7 +451,7 @@ export default function CircleSwap({ language }: { language: Language }) {
       const adapter = await getAdapter();
       setPhase('wallet');
       const result = await swapKit.swap({
-        from: { adapter, chain: SwapChain.Arc_Testnet },
+        from: { adapter, chain: SwapChain.Arc },
         tokenIn,
         tokenOut,
         amountIn: normalizeSwapAmount(amount) ?? amount,
@@ -471,7 +471,7 @@ export default function CircleSwap({ language }: { language: Language }) {
 
       const hash = result.txHash as `0x${string}`;
       saveLocalSwapHistory({
-        chainId: arcNetworkTestnet.id,
+        chainId: arcNetwork.id,
         address,
         timestamp: Date.now(),
         status: result.progress.status === 'DONE' ? 'confirmed' : 'pending',
@@ -697,7 +697,7 @@ export default function CircleSwap({ language }: { language: Language }) {
         {txUrl ? (
           <a href={txUrl} target="_blank" rel="noreferrer" className="btn-ghost h-10 justify-self-start px-3 text-xs">
             <ExternalLink size={14} />
-            ArcScan
+            Arc Explorer
           </a>
         ) : null}
 

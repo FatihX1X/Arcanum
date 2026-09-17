@@ -1,5 +1,5 @@
-export const arcSwapChainId = 5042002;
-export const circleSwapChain = 'Arc_Testnet' as const;
+export const arcSwapChainId = 5042;
+export const circleSwapChain = 'Arc' as const;
 export const swapTokenDecimals = 6;
 export const defaultSwapSlippageBps = 50;
 export const swapQuoteTtlMs = 30_000;
@@ -51,7 +51,7 @@ export const arcSwapTokens: Record<SwapTokenSymbol, SwapToken> = {
   EURC: {
     symbol: 'EURC',
     name: 'Euro Coin',
-    address: '0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a',
+    address: '0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1',
     decimals: swapTokenDecimals,
   },
 };

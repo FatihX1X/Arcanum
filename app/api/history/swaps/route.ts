@@ -5,7 +5,7 @@ import { netArcSwapTransfers } from '@/lib/history';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-const arcScanApi = 'https://testnet.arcscan.app/api/v2';
+const arcExplorerApi = 'https://explorer.arc.io/api/v2';
 const maximumPagesPerRequest = 3;
 
 type ArcScanResponse = {
@@ -45,7 +45,7 @@ export async function GET(request: Request) {
   let nextCursor = cursor;
   try {
     for (let page = 0; page < maximumPagesPerRequest; page += 1) {
-      const url = new URL(`${arcScanApi}/addresses/${address}/token-transfers`);
+      const url = new URL(`${arcExplorerApi}/addresses/${address}/token-transfers`);
       url.searchParams.set('type', 'ERC-20');
       for (const [key, value] of Object.entries(nextCursor ?? {})) {
         url.searchParams.set(key, String(value));
@@ -55,7 +55,7 @@ export async function GET(request: Request) {
         headers: { Accept: 'application/json' },
         signal: AbortSignal.timeout(12_000),
       });
-      if (!response.ok) throw new Error(`ArcScan returned ${response.status}`);
+      if (!response.ok) throw new Error(`Arc Explorer returned ${response.status}`);
       const payload = await response.json() as ArcScanResponse;
       transfers.push(...(payload.items ?? []));
       nextCursor = payload.next_page_params ?? null;
@@ -68,7 +68,7 @@ export async function GET(request: Request) {
     );
   } catch {
     return Response.json(
-      { error: 'ArcScan history is temporarily unavailable.' },
+      { error: 'Arc Explorer history is temporarily unavailable.' },
       { status: 502, headers: { 'Cache-Control': 'no-store' } },
     );
   }

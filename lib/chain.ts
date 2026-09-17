@@ -1,25 +1,25 @@
 import { defineChain } from 'viem';
 
 export const arcNetwork = defineChain({
-  id: Number(process.env.NEXT_PUBLIC_CHAIN_ID || 5042),
-  name: process.env.NEXT_PUBLIC_CHAIN_NAME || 'Arc',
+  id: 5042,
+  name: 'Arc',
   nativeCurrency: {
     decimals: 18,
-    name: process.env.NEXT_PUBLIC_NATIVE_CURRENCY_NAME || 'USDC',
-    symbol: process.env.NEXT_PUBLIC_NATIVE_CURRENCY_SYMBOL || 'USDC',
+    name: 'USDC',
+    symbol: 'USDC',
   },
   rpcUrls: {
     default: {
-      http: [process.env.NEXT_PUBLIC_RPC_URL || 'https://rpc.mainnet.arc.io'],
+      http: ['https://rpc.mainnet.arc.io'],
     },
     public: {
-      http: [process.env.NEXT_PUBLIC_RPC_URL || 'https://rpc.mainnet.arc.io'],
+      http: ['https://rpc.mainnet.arc.io'],
     },
   },
   blockExplorers: {
     default: {
-      name: process.env.NEXT_PUBLIC_EXPLORER_NAME || 'Arc Explorer',
-      url: process.env.NEXT_PUBLIC_EXPLORER_URL || 'https://explorer.arc.io',
+      name: 'Arc Explorer',
+      url: 'https://explorer.arc.io',
     },
   },
   testnet: false,

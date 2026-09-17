@@ -29,7 +29,7 @@ A private on-chain messenger for Arc Network.
 - ArcanumGigBoard: `0xE238054755B41cA6bDe7C848F9b3e92BCEE22b4A` (block `21380711`)
 - ArcanumEscrow: `0xf9DD777185da559aDadbf298092DE7e6A050a93E` (block `21380714`)
 
-Circle Swap and Bridge still use Arc Testnet routes from Circle’s kit.
+Circle Swap (USDC/EURC) and Circle CCTP V2 Bridge run on Arc mainnet.
 
 ## Arc Testnet (legacy)
 

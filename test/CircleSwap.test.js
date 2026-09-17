@@ -21,9 +21,14 @@ function loadCircleSwapModule() {
   return mod.exports;
 }
 
-describe('Circle swap safeguards', function () {
+describe('Circle swap safeguards (Arc mainnet)', function () {
   const swap = loadCircleSwapModule();
   const account = '0x1111111111111111111111111111111111111111';
+
+  it('targets Arc mainnet', function () {
+    expect(swap.arcSwapChainId).to.equal(5042);
+    expect(swap.circleSwapChain).to.equal('Arc');
+  });
 
   it('accepts only six-decimal amount input and converts it without floating point math', function () {
     expect(swap.isSwapAmountInput('123.456789')).to.equal(true);
@@ -91,12 +96,12 @@ describe('Circle swap safeguards', function () {
             account,
           ];
         }
-        return '0x4cef52';
+        return '0x13b2';
       },
     }, account);
 
     expect(await provider.request({ method: 'eth_accounts' })).to.deep.equal([account]);
-    expect(await provider.request({ method: 'eth_chainId' })).to.equal('0x4cef52');
+    expect(await provider.request({ method: 'eth_chainId' })).to.equal('0x13b2');
     expect(calls).to.deep.equal(['eth_accounts', 'eth_chainId']);
   });
 
@@ -120,8 +125,8 @@ describe('Circle swap safeguards', function () {
   it('accepts an intact mock estimate from the connected account', function () {
     const estimate = {
       amountIn: '1.00',
-      chainIn: 'Arc_Testnet',
-      chainOut: 'Arc_Testnet',
+      chainIn: 'Arc',
+      chainOut: 'Arc',
       fromAddress: account,
       toAddress: account,
       tokenIn: 'USDC',
@@ -139,8 +144,8 @@ describe('Circle swap safeguards', function () {
   it('rejects a mock provider response that changes chain, recipient, amount, or tokens', function () {
     const base = {
       amountIn: '1',
-      chainIn: 'Arc_Testnet',
-      chainOut: 'Arc_Testnet',
+      chainIn: 'Arc',
+      chainOut: 'Arc',
       fromAddress: account,
       toAddress: account,
       tokenIn: 'USDC',

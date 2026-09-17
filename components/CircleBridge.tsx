@@ -37,7 +37,7 @@ import {
   bridgeChainById,
   bridgeChainByKey,
   bridgeDestinationsFor,
-  bridgeEvmTestnets,
+  bridgeEvmChains,
   defaultBridgeCounterpart,
   isSupportedArcBridgeRoute,
   type BridgeChainKey,
@@ -97,7 +97,7 @@ function createBridgeBrowserAdapter(provider: EIP1193Provider) {
     }),
     capabilities: {
       addressContext: 'user-controlled',
-      supportedChains: [...bridgeEvmTestnets],
+      supportedChains: [...bridgeEvmChains],
     },
   });
 }
@@ -106,7 +106,7 @@ const bridgeCopy = {
   en: {
     title: 'Bridge',
     eyebrow: 'Circle CCTP V2',
-    description: 'Move USDC between Arc Testnet and supported EVM testnets using Circle contracts and Forwarding Service.',
+    description: 'Move USDC between Arc mainnet and supported EVM chains using Circle CCTP V2 and Forwarding Service.',
     source: 'Source network',
     destination: 'Destination network',
     amount: 'Amount',
@@ -148,7 +148,7 @@ const bridgeCopy = {
       rejected: 'The wallet request was rejected.',
       'wrong-source-chain': 'The wallet is not connected to the selected source network.',
       'wallet-provider': 'The connected wallet account could not be accessed.',
-      'unsupported-route': 'This Arc Testnet bridge route is not supported by Circle.',
+      'unsupported-route': 'This Arc mainnet bridge route is not supported by Circle.',
       'insufficient-usdc': 'The wallet does not have enough USDC.',
       'insufficient-gas': 'The source network native gas balance is insufficient.',
       'quote-expired': 'The estimate expired. Request a new estimate.',
@@ -162,7 +162,7 @@ const bridgeCopy = {
   tr: {
     title: 'Bridge',
     eyebrow: 'Circle CCTP V2',
-    description: 'USDC’yi Circle kontratları ve Forwarding Service ile Arc Testnet ve desteklenen EVM testnetleri arasında taşıyın.',
+    description: 'USDC’yi Circle kontratları ve Forwarding Service ile Arc mainnet ve desteklenen EVM ağları arasında taşıyın.',
     source: 'Kaynak ağ',
     destination: 'Hedef ağ',
     amount: 'Miktar',
@@ -204,7 +204,7 @@ const bridgeCopy = {
       rejected: 'Cüzdan isteği reddedildi.',
       'wrong-source-chain': 'Cüzdan seçili kaynak ağa bağlı değil.',
       'wallet-provider': 'Bağlı cüzdan hesabına erişilemedi.',
-      'unsupported-route': 'Bu Arc Testnet bridge rotası Circle tarafından desteklenmiyor.',
+      'unsupported-route': 'Bu Arc mainnet bridge rotası Circle tarafından desteklenmiyor.',
       'insufficient-usdc': 'Cüzdanda yeterli USDC yok.',
       'insufficient-gas': 'Kaynak ağdaki native gas bakiyesi yetersiz.',
       'quote-expired': 'Tahminin süresi doldu. Yeni tahmin alın.',
@@ -561,7 +561,7 @@ export default function CircleBridge({ language }: { language: Language }) {
           <label className="grid gap-2 text-sm text-zinc-400">
             {t.source}
             <select className="input" value={sourceKey} onChange={(event) => changeSource(event.target.value as BridgeChainKey)} disabled={busy}>
-              {bridgeEvmTestnets.map((chain) => <option key={chain.chain} value={chain.chain}>{chain.name}</option>)}
+              {bridgeEvmChains.map((chain) => <option key={chain.chain} value={chain.chain}>{chain.name}</option>)}
             </select>
           </label>
           <button type="button" onClick={flipDirection} disabled={busy} className="btn-ghost h-11 w-11" aria-label={`${t.source} / ${t.destination}`}>

@@ -57,3 +57,17 @@ export const arcMainnetDeployments = {
 } as const;
 
 export const arcDeployments = arcMainnetDeployments;
+
+const testnetContractAddresses = new Set(
+  Object.values(arcTestnetDeployments)
+    .filter((value): value is { address: string; blockNumber: number } => (
+      typeof value === 'object' && value !== null && 'address' in value
+    ))
+    .map((value) => value.address.toLowerCase()),
+);
+
+export function configuredAddress(envValue: string | undefined, mainnetAddress: string) {
+  const value = envValue?.trim();
+  if (!value || testnetContractAddresses.has(value.toLowerCase())) return mainnetAddress;
+  return value;
+}
