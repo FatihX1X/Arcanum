@@ -4,7 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, ExternalLink, KeyRound, Loader2, Plus, RefreshCw, Send, Settings2, ShieldCheck, UsersRound, X } from 'lucide-react';
 import { isAddress } from 'viem';
 import { useAccount, useChainId, usePublicClient, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
-import { arcNetworkTestnet, transactionUrl } from '../lib/chain';
+import { arcNetwork, transactionUrl } from '../lib/chain';
 import { arcanumMessengerAbi, arcanumMessengerAddress } from '../lib/contract';
 import {
   createGroupEncryption,
@@ -42,7 +42,7 @@ const text = {
   en: {
     eyebrow: 'Group chat', title: 'Encrypted Groups', refresh: 'Refresh', empty: 'No encrypted groups yet.',
     emptyBody: 'Create a group with the + button. Member addresses are public; names and messages are encrypted.',
-    noWallet: 'Connect your wallet to load groups.', wrongChain: 'Switch to Arc Testnet to use encrypted groups.',
+    noWallet: 'Connect your wallet to load groups.', wrongChain: 'Switch to Arc to use encrypted groups.',
     notConfigured: 'Group contract is not configured yet.', create: 'Create encrypted group', manage: 'Manage members',
     name: 'Group name', members: 'Member addresses', membersHint: 'One address per line or comma. Your wallet is included automatically.',
     privacy: 'Member addresses are visible on-chain. The group name, key and messages remain encrypted.',
@@ -59,7 +59,7 @@ const text = {
   tr: {
     eyebrow: 'Grup sohbeti', title: 'Şifreli Gruplar', refresh: 'Yenile', empty: 'Henüz şifreli grup yok.',
     emptyBody: '+ butonuyla grup oluşturun. Üye adresleri görünür; grup adı ve mesajlar şifrelidir.',
-    noWallet: 'Grupları yüklemek için cüzdanınızı bağlayın.', wrongChain: 'Şifreli gruplar için Arc Testnet ağına geçin.',
+    noWallet: 'Grupları yüklemek için cüzdanınızı bağlayın.', wrongChain: 'Şifreli gruplar için Arc ağına geçin.',
     notConfigured: 'Grup contract adresi henüz yapılandırılmadı.', create: 'Şifreli grup oluştur', manage: 'Üyeleri yönet',
     name: 'Grup adı', members: 'Üye adresleri', membersHint: 'Her satıra veya virgülle bir adres. Cüzdanınız otomatik eklenir.',
     privacy: 'Üye adresleri zincirde görünür. Grup adı, anahtar ve mesajlar şifreli kalır.',
@@ -98,10 +98,10 @@ export default function GroupMessages({ language }: { language: Language }) {
   const copy = text[language];
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
-  const publicClient = usePublicClient({ chainId: arcNetworkTestnet.id });
+  const publicClient = usePublicClient({ chainId: arcNetwork.id });
   const { writeContractAsync, isPending: walletPending } = useWriteContract();
   const [hash, setHash] = useState<`0x${string}` | undefined>();
-  const receipt = useWaitForTransactionReceipt({ hash, chainId: arcNetworkTestnet.id });
+  const receipt = useWaitForTransactionReceipt({ hash, chainId: arcNetwork.id });
   const [groups, setGroups] = useState<GroupView[]>([]);
   const [selectedId, setSelectedId] = useState<`0x${string}` | ''>('');
   const [loading, setLoading] = useState(false);
@@ -112,7 +112,7 @@ export default function GroupMessages({ language }: { language: Language }) {
   const [groupName, setGroupName] = useState('');
   const [memberInput, setMemberInput] = useState('');
 
-  const isCorrectChain = chainId === arcNetworkTestnet.id;
+  const isCorrectChain = chainId === arcNetwork.id;
   const selected = groups.find((group) => group.record.id === selectedId);
 
   const readEnvelopeKey = useCallback(async (groupId: `0x${string}`, epoch: number, viewer: `0x${string}`) => {
@@ -125,7 +125,7 @@ export default function GroupMessages({ language }: { language: Language }) {
     })) as string;
     if (!envelope) return null;
     return openGroupKeyEnvelope(envelope, viewer, {
-      chainId: arcNetworkTestnet.id,
+      chainId: arcNetwork.id,
       contractAddress: arcanumGroupsAddress,
       groupId,
       epoch,
@@ -173,7 +173,7 @@ export default function GroupMessages({ language }: { language: Language }) {
         if (currentKey) {
           try {
             const metadata = await decryptGroupMetadata(record.encryptedMetadata, currentKey, {
-              chainId: arcNetworkTestnet.id,
+              chainId: arcNetwork.id,
               contractAddress: arcanumGroupsAddress,
               groupId,
               epoch: currentEpoch,
@@ -198,7 +198,7 @@ export default function GroupMessages({ language }: { language: Language }) {
           if (!key) return { ...item, text: copy.noKey, decryptable: false };
           try {
             const value = await decryptGroupMessage(item.payload, key, {
-              chainId: arcNetworkTestnet.id,
+              chainId: arcNetwork.id,
               contractAddress: arcanumGroupsAddress,
               groupId,
               epoch: Number(item.epoch),
@@ -279,7 +279,7 @@ export default function GroupMessages({ language }: { language: Language }) {
       const groupId = modal === 'create' ? createRandomGroupId() : selected!.record.id;
       const epoch = modal === 'create' ? 1 : Number(selected!.record.currentEpoch) + 1;
       const encrypted = await createGroupEncryption(groupName.trim(), address, keys, {
-        chainId: arcNetworkTestnet.id,
+        chainId: arcNetwork.id,
         contractAddress: arcanumGroupsAddress,
         groupId,
         epoch,
@@ -290,7 +290,7 @@ export default function GroupMessages({ language }: { language: Language }) {
         abi: arcanumGroupsAbi,
         functionName: modal === 'create' ? 'createGroup' : 'updateMembers',
         args: [groupId, parsedMemberInput.members, encrypted.encryptedMetadata, encrypted.envelopes],
-        chainId: arcNetworkTestnet.id,
+        chainId: arcNetwork.id,
       });
       setHash(nextHash);
       setStatus(copy.pending);
@@ -311,7 +311,7 @@ export default function GroupMessages({ language }: { language: Language }) {
       const key = await readEnvelopeKey(selected.record.id, epoch, address);
       if (!key) throw new Error(copy.noKey);
       const payload = await encryptGroupMessage(message.trim(), key, address, {
-        chainId: arcNetworkTestnet.id,
+        chainId: arcNetwork.id,
         contractAddress: arcanumGroupsAddress,
         groupId: selected.record.id,
         epoch,
@@ -324,7 +324,7 @@ export default function GroupMessages({ language }: { language: Language }) {
         functionName: 'sendGroupMessage',
         args: [selected.record.id, BigInt(epoch), payload],
         value: groupMessageFee,
-        chainId: arcNetworkTestnet.id,
+        chainId: arcNetwork.id,
       });
       setHash(nextHash);
       setStatus(copy.pending);

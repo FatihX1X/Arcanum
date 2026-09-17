@@ -25,7 +25,7 @@ import {
 } from '@circle-fin/bridge-kit/chains';
 import { defineChain, type Chain } from 'viem';
 
-import { arcNetworkTestnet } from './chain';
+import { arcNetwork, arcNetworkTestnet } from './chain';
 
 export const bridgeEvmTestnets = [
   ArcTestnet,
@@ -83,7 +83,7 @@ function toViemChain(chain: BridgeEvmTestnet): Chain {
   });
 }
 
-export const bridgeWagmiChains = bridgeEvmTestnets.map(toViemChain) as [
+export const bridgeWagmiChains = [arcNetwork, ...bridgeEvmTestnets.map(toViemChain)] as [
   Chain,
   ...Chain[],
 ];

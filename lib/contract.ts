@@ -1,8 +1,8 @@
 import { parseEther } from 'viem';
-import { arcTestnetDeployments, zeroAddress } from './deployments';
+import { arcDeployments, zeroAddress } from './deployments';
 
 export const arcanumMessengerAddress = (
-  process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || arcTestnetDeployments.messenger.address
+  process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || arcDeployments.messenger.address
 ) as `0x${string}`;
 
 export const isArcanumMessengerConfigured =

@@ -1,8 +1,8 @@
 import { parseEther } from 'viem';
-import { arcTestnetDeployments, zeroAddress } from './deployments';
+import { arcDeployments, zeroAddress } from './deployments';
 
 export const arcanumGroupsAddress = (
-  process.env.NEXT_PUBLIC_GROUP_CONTRACT_ADDRESS || arcTestnetDeployments.groups.address
+  process.env.NEXT_PUBLIC_GROUP_CONTRACT_ADDRESS || arcDeployments.groups.address
 ) as `0x${string}`;
 
 export const isArcanumGroupsConfigured = arcanumGroupsAddress !== zeroAddress;

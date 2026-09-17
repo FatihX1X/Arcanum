@@ -1,7 +1,7 @@
-import { arcTestnetDeployments, zeroAddress } from './deployments';
+import { arcDeployments, zeroAddress } from './deployments';
 
 export const arcanumBulkSenderAddress = (
-  process.env.NEXT_PUBLIC_BULK_CONTRACT_ADDRESS || arcTestnetDeployments.bulkSender.address
+  process.env.NEXT_PUBLIC_BULK_CONTRACT_ADDRESS || arcDeployments.bulkSender.address
 ) as `0x${string}`;
 
 export const isArcanumBulkSenderConfigured = arcanumBulkSenderAddress !== zeroAddress;

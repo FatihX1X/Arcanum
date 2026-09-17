@@ -33,7 +33,7 @@ import {
   useWriteContract,
 } from 'wagmi';
 import { isAddress, zeroAddress } from 'viem';
-import { arcAddEthereumChainParams, arcNetworkTestnet, transactionUrl } from '../lib/chain';
+import { arcAddEthereumChainParams, arcNetwork, transactionUrl } from '../lib/chain';
 import { bridgeChainById } from '../lib/bridgeChains';
 import {
   arcanumMessengerAbi,
@@ -214,7 +214,7 @@ export default function WalletConnect() {
   const t = copy[language];
   const connector = connectors.find((item) => item.id === 'injected') ?? connectors[0];
   const connectedAddress = address ?? zeroAddress;
-  const isCorrectChain = chainId === arcNetworkTestnet.id;
+  const isCorrectChain = chainId === arcNetwork.id;
   const activeRecipient = selected || newRecipient.trim();
   const recipientValid = isAddress(activeRecipient);
   const recipientSelf = Boolean(address && recipientValid && activeRecipient.toLowerCase() === address.toLowerCase());
@@ -300,7 +300,7 @@ export default function WalletConnect() {
 
     try {
       if (!provider) {
-        await switchChainAsync({ chainId: arcNetworkTestnet.id });
+        await switchChainAsync({ chainId: arcNetwork.id });
         return;
       }
 
@@ -326,7 +326,7 @@ export default function WalletConnect() {
       }
     } catch (error) {
       try {
-        await switchChainAsync({ chainId: arcNetworkTestnet.id });
+        await switchChainAsync({ chainId: arcNetwork.id });
       } catch {
         setTxStep('error');
         setStatus(t.status.switchRejected);
@@ -568,12 +568,12 @@ export default function WalletConnect() {
               String(recipientKey),
               address as `0x${string}`,
               activeRecipient as `0x${string}`,
-              { chainId: arcNetworkTestnet.id, contractAddress: arcanumMessengerAddress },
+              { chainId: arcNetwork.id, contractAddress: arcanumMessengerAddress },
             )
           : trimmedMessage;
       if (privacy === 'private') {
         await assertPrivatePayloadV3(payload, {
-          chainId: arcNetworkTestnet.id,
+          chainId: arcNetwork.id,
           contractAddress: arcanumMessengerAddress,
           senderAddress: address as `0x${string}`,
           recipientAddress: activeRecipient as `0x${string}`,
@@ -1420,7 +1420,7 @@ function InfoPanel({ title, eyebrow, items, icon }: { title: string; eyebrow: st
           <p className="eyebrow">{eyebrow}</p>
           <h2 className="panel-title">{title}</h2>
         </div>
-        <Pill tone="success" icon={icon} label="Arc Testnet" />
+        <Pill tone="success" icon={icon} label="Arc" />
       </div>
       <div className="mt-5 grid gap-3 lg:grid-cols-2">
         {items.map((item) => (

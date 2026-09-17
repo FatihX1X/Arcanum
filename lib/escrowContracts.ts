@@ -1,11 +1,11 @@
-import { arcTestnetDeployments, zeroAddress } from './deployments';
+import { arcDeployments, zeroAddress } from './deployments';
 
 export const arcanumGigBoardAddress = (
-  process.env.NEXT_PUBLIC_GIG_BOARD_CONTRACT_ADDRESS || arcTestnetDeployments.gigBoard.address
+  process.env.NEXT_PUBLIC_GIG_BOARD_CONTRACT_ADDRESS || arcDeployments.gigBoard.address
 ) as `0x${string}`;
 
 export const arcanumEscrowAddress = (
-  process.env.NEXT_PUBLIC_ESCROW_CONTRACT_ADDRESS || arcTestnetDeployments.escrow.address
+  process.env.NEXT_PUBLIC_ESCROW_CONTRACT_ADDRESS || arcDeployments.escrow.address
 ) as `0x${string}`;
 
 export const isArcanumGigBoardConfigured = arcanumGigBoardAddress !== zeroAddress;

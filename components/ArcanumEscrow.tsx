@@ -25,7 +25,7 @@ import {
 import { encodePacked, formatEther, isAddress, isHex, keccak256, parseEther, toBytes } from 'viem';
 import { useAccount, useChainId, usePublicClient, useReadContract, useWatchContractEvent, useWriteContract } from 'wagmi';
 import { arcanumAgentsAbi, arcanumAgentsAddress, isArcanumAgentsConfigured } from '../lib/agentsContract';
-import { arcNetworkTestnet, transactionUrl } from '../lib/chain';
+import { arcNetwork, transactionUrl } from '../lib/chain';
 import { arcanumMessengerAbi, arcanumMessengerAddress } from '../lib/contract';
 import {
   decryptEscrowChatMessage,
@@ -34,7 +34,7 @@ import {
   isEncryptionKeyUnlocked,
   type EscrowChatCryptoContext,
 } from '../lib/crypto';
-import { arcTestnetDeployments } from '../lib/deployments';
+import { arcDeployments } from '../lib/deployments';
 import {
   arcanumEscrowAbi,
   arcanumEscrowAddress,
@@ -156,7 +156,7 @@ export default function ArcanumEscrow({ language, onOpenKeyCenter }: { language:
   const [composer, setComposer] = useState('');
 
   const configured = isArcanumEscrowSuiteConfigured;
-  const correctChain = chainId === arcNetworkTestnet.id;
+  const correctChain = chainId === arcNetwork.id;
   const selectedGig = gigs.find((gig) => gig.id === selectedGigId);
   const selectedConversation = conversations.find((item) => item.id === selectedConversationId);
   const conversationOptions = conversations.filter((item) => item.gigId === selectedGigId);
@@ -223,7 +223,7 @@ export default function ArcanumEscrow({ language, onOpenKeyCenter }: { language:
   }, [configured, publicClient, selectedEscrow]);
 
   const refreshActivity = useCallback(async () => {
-    if (!publicClient || !configured || !selectedEscrow || Number(arcTestnetDeployments.escrow.blockNumber) === 0) {
+    if (!publicClient || !configured || !selectedEscrow || Number(arcDeployments.escrow.blockNumber) === 0) {
       setActivity([]);
       return;
     }
@@ -231,7 +231,7 @@ export default function ArcanumEscrow({ language, onOpenKeyCenter }: { language:
       const logs = await publicClient.getContractEvents({
         address: arcanumEscrowAddress,
         abi: arcanumEscrowAbi,
-        fromBlock: BigInt(arcTestnetDeployments.escrow.blockNumber),
+        fromBlock: BigInt(arcDeployments.escrow.blockNumber),
         toBlock: 'latest',
       });
       const filtered = logs.filter((log) => {
@@ -336,7 +336,7 @@ export default function ArcanumEscrow({ language, onOpenKeyCenter }: { language:
     const recipientKey = await resolveKey(recipient);
     if (!recipientKey) throw new Error(t.recipientKey);
     return encryptEscrowChatMessage(plain, recipientKey, {
-      chainId: arcNetworkTestnet.id,
+      chainId: arcNetwork.id,
       contractAddress: arcanumGigBoardAddress,
       conversationId: conversationContext(gig, conversation.counterparty),
       senderAddress: address,
@@ -351,7 +351,7 @@ export default function ArcanumEscrow({ language, onOpenKeyCenter }: { language:
       const recipientKey = await resolveKey(selectedGig.creator);
       if (!recipientKey) { setFlowError(t.recipientKey); return; }
       const payload = await encryptEscrowChatMessage(initialMessage.trim(), recipientKey, {
-        chainId: arcNetworkTestnet.id,
+        chainId: arcNetwork.id,
         contractAddress: arcanumGigBoardAddress,
         conversationId: conversationContext(selectedGig, address),
         senderAddress: address,
@@ -532,7 +532,7 @@ function EncryptedText({ t, message, conversation, gig, viewer }: { t: typeof te
     let cancelled = false;
     async function run() {
       if (!viewer) return;
-      const expected: EscrowChatCryptoContext = { chainId: arcNetworkTestnet.id, contractAddress: arcanumGigBoardAddress, conversationId: contextId, senderAddress: message.sender, recipientAddress: recipient };
+      const expected: EscrowChatCryptoContext = { chainId: arcNetwork.id, contractAddress: arcanumGigBoardAddress, conversationId: contextId, senderAddress: message.sender, recipientAddress: recipient };
       try {
         const value = await decryptEscrowChatMessage(message.payload, viewer, expected);
         if (!cancelled) { setPlain(value); setFailed(false); }

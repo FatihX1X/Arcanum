@@ -4,7 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState, type ReactNode } 
 import { CreditCard, KeyRound, Lock, Plus, RefreshCw, Search, Send, Shield, UserPlus } from 'lucide-react';
 import { formatEther, isAddress, parseEther, zeroAddress } from 'viem';
 import { useAccount, useChainId, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
-import { arcNetworkTestnet, transactionUrl } from '../lib/chain';
+import { arcNetwork, transactionUrl } from '../lib/chain';
 import {
   agentMessageFeeLabel,
   arcanumAgentsAbi,
@@ -49,7 +49,7 @@ const text = {
     deactivate: 'Deactivate',
     notConfigured: 'Agent contract is not configured.',
     disconnected: 'Connect your wallet to use agent messaging.',
-    wrongNetwork: 'Switch to Arc Testnet to use agent messaging.',
+    wrongNetwork: 'Switch to Arc to use agent messaging.',
     newChat: 'New agent address',
     recipient: '0x agent recipient',
     search: 'Search agent',
@@ -97,7 +97,7 @@ const text = {
     deactivate: 'Pasif et',
     notConfigured: 'Agent kontrat adresi ayarlanmamis.',
     disconnected: 'Agent mesajlasma icin cuzdanini bagla.',
-    wrongNetwork: 'Agent mesajlasma icin Arc Testnet agina gec.',
+    wrongNetwork: 'Agent mesajlasma icin Arc agina gec.',
     newChat: 'Yeni agent adresi',
     recipient: '0x agent alici',
     search: 'Agent ara',
@@ -206,7 +206,7 @@ export default function AgentMessages({ language }: { language: Language }) {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const { writeContractAsync, isPending: isWritePending } = useWriteContract();
-  const isCorrectChain = chainId === arcNetworkTestnet.id;
+  const isCorrectChain = chainId === arcNetwork.id;
   const connectedAddress = address ?? zeroAddress;
 
   const [profileName, setProfileName] = useState('');
@@ -446,12 +446,12 @@ export default function AgentMessages({ language }: { language: Language }) {
               String(recipientKey),
               address,
               activeRecipient as `0x${string}`,
-              { chainId: arcNetworkTestnet.id, contractAddress: arcanumAgentsAddress },
+              { chainId: arcNetwork.id, contractAddress: arcanumAgentsAddress },
             )
           : message.trim();
       if (privacy === 'private') {
         await assertPrivatePayloadV3(payload, {
-          chainId: arcNetworkTestnet.id,
+          chainId: arcNetwork.id,
           contractAddress: arcanumAgentsAddress,
           senderAddress: address,
           recipientAddress: activeRecipient as `0x${string}`,

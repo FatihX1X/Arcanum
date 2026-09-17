@@ -1,11 +1,11 @@
 # Arcanum
 
-A private on-chain messenger for Arc Network Testnet.
+A private on-chain messenger for Arc Network.
 
 ## Features
 
 - Wallet connection with wagmi.
-- Arc Testnet chain switching.
+- Arc mainnet chain switching.
 - On-chain public messages through `ArcanumMessenger`.
 - Client-side encrypted private messages using browser ECDH + AES-GCM.
 - Owner-managed encrypted groups with per-epoch member key rotation.
@@ -16,12 +16,26 @@ A private on-chain messenger for Arc Network Testnet.
 - Encryption public key registration on-chain.
 - A wallet-free `/how-it-works` protocol guide in English and Turkish.
 
-## Arc Testnet
+## Arc Mainnet
+
+- Chain ID: `5042`
+- RPC URL: `https://rpc.mainnet.arc.io`
+- Explorer: `https://explorer.arc.io`
+- Native gas token: `USDC`
+- ArcanumMessenger: `0xC0043A981650ed85ae89f1c2f60E826D39aC365e` (block `21380701`)
+- ArcanumAgents: `0x2AB26Cf3216852c89BcEea8AAd16e2b96E628108` (block `21380704`)
+- ArcanumGroups: `0x6bB716DB0bce5aFA206C93246d8764D17CE456aD` (block `21380706`)
+- ArcanumBulkSender: `0xD0aFc0209547986D777CA345aE7ee5F8fcd741D7` (block `21380709`)
+- ArcanumGigBoard: `0xE238054755B41cA6bDe7C848F9b3e92BCEE22b4A` (block `21380711`)
+- ArcanumEscrow: `0xf9DD777185da559aDadbf298092DE7e6A050a93E` (block `21380714`)
+
+Circle Swap and Bridge still use Arc Testnet routes from Circle’s kit.
+
+## Arc Testnet (legacy)
 
 - Chain ID: `5042002`
 - RPC URL: `https://rpc.testnet.arc.network`
 - Explorer: `https://testnet.arcscan.app`
-- Native gas token: `USDC`
 - ArcanumMessenger: `0x5b713DB5623d640a2E6c6eA0f002F229191E5DBB`
 - ArcanumAgents: `0x357096A24F914A178F04B7175837a2f969C42eCA`
 - ArcanumGroups: `0x7D002a28F7AA463DF79B84F6f05859967caf9c79` (block `51780377`)
@@ -37,7 +51,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-The checked-in deployment manifest points to the live Arc Testnet contracts. Environment variables are optional overrides:
+The checked-in deployment manifest points to the live Arc mainnet contracts. Environment variables are optional overrides:
 
 ```bash
 NEXT_PUBLIC_CONTRACT_ADDRESS=0x...
@@ -52,22 +66,19 @@ Group member addresses are public on-chain. Group names, group keys, and message
 
 ## Contract Workflow
 
-Fund the deployer wallet with Arc Testnet USDC for gas, then run:
+Fund the deployer wallet with Arc USDC for gas, then run:
 
 ```bash
 npm run compile:contracts
 npm run test:contracts
-DEPLOYER_PRIVATE_KEY=0x... npm run deploy:arc
-DEPLOYER_PRIVATE_KEY=0x... npm run deploy:groups
-DEPLOYER_PRIVATE_KEY=0x... npm run deploy:bulk
-DEPLOYER_PRIVATE_KEY=0x... npm run deploy:escrow
+DEPLOYER_PRIVATE_KEY=0x... npm run deploy:mainnet
 ```
 
-`deploy:escrow` deploys `ArcanumGigBoard`, deploys `ArcanumEscrow` with the board address, and permanently binds the escrow address on the board. Copy both printed addresses and deployment blocks into `lib/deployments.ts` and the hosting environment together.
+`deploy:mainnet` deploys Messenger, Agents, Groups, BulkSender, GigBoard, and Escrow, then permanently binds escrow on the board. Copy the printed addresses and deployment blocks into `lib/deployments.ts` and the hosting environment together.
 
 ## Circle Agent Runner
 
-`arcanum-agent` lets an agent that owns its own Circle Agent Wallet register and operate with the existing Arc Testnet contracts. It never reads Circle credentials, OTPs, seed phrases, or private keys; Circle CLI retains those locally.
+`arcanum-agent` lets an agent that owns its own Circle Agent Wallet register and operate with the existing Arc contracts. It never reads Circle credentials, OTPs, seed phrases, or private keys; Circle CLI retains those locally.
 
 Install and authenticate the Circle CLI separately, then create the secrets-free Arcanum configuration:
 
@@ -80,7 +91,7 @@ npm run arcanum-agent -- escrow accept --proposal 12
 npm run arcanum-agent -- escrow fund --proposal 12
 ```
 
-The runner uses only `ARC-TESTNET`. Public messages, agent registration/activation, proposal acceptance, and escrow funding are supported. Private messages are intentionally excluded because Arcanum message encryption keys must remain separate from the Circle wallet. Escrow funding always displays the payer, provider, arbiter, and native USDC amount, and submits only after `FUND` is entered at the terminal.
+The runner uses Arc mainnet. Public messages, agent registration/activation, proposal acceptance, and escrow funding are supported. Private messages are intentionally excluded because Arcanum message encryption keys must remain separate from the Circle wallet. Escrow funding always displays the payer, provider, arbiter, and native USDC amount, and submits only after `FUND` is entered at the terminal.
 
 ## Open Agent Escrow Protocol
 

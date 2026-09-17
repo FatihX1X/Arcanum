@@ -19,7 +19,7 @@ import ArcanumBrand from './ArcanumBrand';
 
 const content = {
   en: {
-    eyebrow: 'Protocol guide', title: 'How Arcanum Works', intro: 'Arcanum combines browser-side encryption with immutable Arc Testnet delivery. Your wallet authorizes every write; plaintext private messages never reach the chain.',
+    eyebrow: 'Protocol guide', title: 'How Arcanum Works', intro: 'Arcanum combines browser-side encryption with immutable Arc delivery. Your wallet authorizes every write; plaintext private messages never reach the chain.',
     back: 'Back to Arcanum', language: 'Switch language', privateTitle: 'Private messages', privateBody: 'The browser derives an ECDH shared secret, encrypts with AES-GCM, and writes only ciphertext to ArcanumMessenger.',
     publicTitle: 'Public messages', publicBody: 'Plaintext is stored permanently on-chain. Use this mode only for information intended for everyone.',
     agentTitle: 'AI Agent messages', agentBody: 'Registered agents exchange public or encrypted payloads and can attach native USDC payments to the same transaction.',
@@ -35,7 +35,7 @@ const content = {
     ],
   },
   tr: {
-    eyebrow: 'Protokol rehberi', title: 'Arcanum Nasıl Çalışır?', intro: 'Arcanum, browser tarafı şifrelemeyi Arc Testnet üzerindeki kalıcı teslimatla birleştirir. Her yazma işlemini cüzdanın onaylar; private mesaj plaintext’i zincire ulaşmaz.',
+    eyebrow: 'Protokol rehberi', title: 'Arcanum Nasıl Çalışır?', intro: 'Arcanum, browser tarafı şifrelemeyi Arc üzerindeki kalıcı teslimatla birleştirir. Her yazma işlemini cüzdanın onaylar; private mesaj plaintext’i zincire ulaşmaz.',
     back: 'Arcanum’a dön', language: 'Dili değiştir', privateTitle: 'Private mesajlar', privateBody: 'Browser ECDH ortak sırrı üretir, AES-GCM ile şifreler ve ArcanumMessenger’a yalnızca ciphertext yazar.',
     publicTitle: 'Public mesajlar', publicBody: 'Plaintext kalıcı olarak on-chain saklanır. Bu modu yalnızca herkesin okuyabileceği bilgiler için kullan.',
     agentTitle: 'AI Agent mesajları', agentBody: 'Kayıtlı agentlar public veya şifreli payload gönderir ve aynı işleme native USDC ödemesi ekleyebilir.',
@@ -109,7 +109,7 @@ export function HowItWorks() {
         </section>
 
         <footer className="flex flex-col items-center justify-between gap-3 border-t border-zinc-800 py-6 text-xs text-zinc-500 sm:flex-row">
-          <span>Arcanum Private Messaging Protocol · Arc Testnet</span>
+          <span>Arcanum Private Messaging Protocol · Arc</span>
           <Link href="/" className="text-accent inline-flex items-center gap-2">{copy.back}<ArrowRight size={13} /></Link>
         </footer>
       </div>

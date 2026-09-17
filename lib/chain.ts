@@ -1,11 +1,8 @@
 import { defineChain } from 'viem';
 
-const fallbackRpcUrl = 'https://rpc.testnet.arc.network';
-const fallbackExplorerUrl = 'https://testnet.arcscan.app';
-
-export const arcNetworkTestnet = defineChain({
-  id: Number(process.env.NEXT_PUBLIC_CHAIN_ID || 5042002),
-  name: process.env.NEXT_PUBLIC_CHAIN_NAME || 'Arc Testnet',
+export const arcNetwork = defineChain({
+  id: Number(process.env.NEXT_PUBLIC_CHAIN_ID || 5042),
+  name: process.env.NEXT_PUBLIC_CHAIN_NAME || 'Arc',
   nativeCurrency: {
     decimals: 18,
     name: process.env.NEXT_PUBLIC_NATIVE_CURRENCY_NAME || 'USDC',
@@ -13,34 +10,55 @@ export const arcNetworkTestnet = defineChain({
   },
   rpcUrls: {
     default: {
-      http: [process.env.NEXT_PUBLIC_RPC_URL || fallbackRpcUrl],
+      http: [process.env.NEXT_PUBLIC_RPC_URL || 'https://rpc.mainnet.arc.io'],
     },
     public: {
-      http: [process.env.NEXT_PUBLIC_RPC_URL || fallbackRpcUrl],
+      http: [process.env.NEXT_PUBLIC_RPC_URL || 'https://rpc.mainnet.arc.io'],
     },
   },
   blockExplorers: {
     default: {
-      name: process.env.NEXT_PUBLIC_EXPLORER_NAME || 'ArcScan',
-      url: process.env.NEXT_PUBLIC_EXPLORER_URL || fallbackExplorerUrl,
+      name: process.env.NEXT_PUBLIC_EXPLORER_NAME || 'Arc Explorer',
+      url: process.env.NEXT_PUBLIC_EXPLORER_URL || 'https://explorer.arc.io',
+    },
+  },
+  testnet: false,
+});
+
+export const arcNetworkTestnet = defineChain({
+  id: 5042002,
+  name: 'Arc Testnet',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'USDC',
+    symbol: 'USDC',
+  },
+  rpcUrls: {
+    default: { http: ['https://rpc.testnet.arc.network'] },
+    public: { http: ['https://rpc.testnet.arc.network'] },
+  },
+  blockExplorers: {
+    default: {
+      name: 'ArcScan',
+      url: 'https://testnet.arcscan.app',
     },
   },
   testnet: true,
 });
 
 export function arcAddEthereumChainParams() {
-  const explorerUrl = arcNetworkTestnet.blockExplorers?.default.url;
+  const explorerUrl = arcNetwork.blockExplorers?.default.url;
 
   return {
-    chainId: `0x${arcNetworkTestnet.id.toString(16)}`,
-    chainName: arcNetworkTestnet.name,
-    nativeCurrency: arcNetworkTestnet.nativeCurrency,
-    rpcUrls: [...arcNetworkTestnet.rpcUrls.default.http],
+    chainId: `0x${arcNetwork.id.toString(16)}`,
+    chainName: arcNetwork.name,
+    nativeCurrency: arcNetwork.nativeCurrency,
+    rpcUrls: [...arcNetwork.rpcUrls.default.http],
     blockExplorerUrls: explorerUrl ? [explorerUrl] : undefined,
   };
 }
 
-export function transactionUrl(hash: string) {
-  const baseUrl = arcNetworkTestnet.blockExplorers?.default.url.replace(/\/$/, '');
+export function transactionUrl(hash: string, chain = arcNetwork) {
+  const baseUrl = chain.blockExplorers?.default.url.replace(/\/$/, '');
   return baseUrl ? `${baseUrl}/tx/${hash}` : undefined;
 }

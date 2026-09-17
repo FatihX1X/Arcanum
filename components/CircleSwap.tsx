@@ -292,7 +292,7 @@ export default function CircleSwap({ language }: { language: Language }) {
     && !busy,
   );
   const transactionHash = lastHash ?? pendingHash;
-  const txUrl = transactionHash ? transactionUrl(transactionHash) : undefined;
+  const txUrl = transactionHash ? transactionUrl(transactionHash, arcNetworkTestnet) : undefined;
 
   const getAdapter = useCallback(async () => {
     if (!address) throw new Error('WALLET_NOT_CONNECTED');
