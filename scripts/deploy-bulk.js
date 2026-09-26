@@ -1,6 +1,7 @@
 const hre = require('hardhat');
 
 async function main() {
+  await require('./deployment-safety').requireMissing(hre, ['bulkSender']);
   const BulkSender = await hre.ethers.getContractFactory('ArcanumBulkSender');
   const bulkSender = await BulkSender.deploy();
   await bulkSender.waitForDeployment();

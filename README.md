@@ -2,6 +2,37 @@
 
 A private on-chain messenger for Arc Network.
 
+## Mainnet audit and Circle Onramp
+
+All six active contracts have a mainnet manifest in `deployments/arcMainnet.json`.
+Run `npm run audit:mainnet` for read-only executable-code and dependency checks.
+See `reports/mainnet-audit.md` for findings and limitations. Deployment commands
+refuse duplicate recorded deployments and unexpected chain IDs.
+
+The **Onramp** navigation tab embeds Circle App Kit on Arc mainnet only. It stays
+unavailable until these server-only Vercel Production variables are configured:
+
+- `CIRCLE_API_KEY`: Circle production key (never a `NEXT_PUBLIC_` variable).
+- `ONRAMP_AUTH_SECRET`: independently generated random secret of at least 32 characters.
+- `ONRAMP_ORIGIN`: exact HTTPS origin, e.g. `https://arcanumchat.xyz`, without a trailing slash.
+
+Redeploy after configuration. Register the hostname with Circle and complete KYB
+for card/Apple Pay/Google Pay access. Production widgets cannot be tested on localhost.
+The current production deployment deliberately has no Circle key configured.
+
+Onramp uses a five-minute signed challenge cookie and a wallet message signature.
+The server derives the destination and user identity from the verified EOA wallet;
+it never accepts a browser-selected destination, API host, assets or referrer domain.
+The short-lived proof is authentication, not transaction permission; it is not a
+globally single-use nonce. Contract-wallet signature validation is not included.
+Before production enablement, apply an appropriate Vercel Firewall rate limit to
+the challenge/session endpoints for expected traffic and Circle account limits.
+
+Widget events only update the UI and refresh on-chain balances. Arcanum does not
+credit an internal account or persist purchase history from browser events. If
+purchase reconciliation is added later, verified Circle webhooks must be its
+source of truth. No live KYC or purchase was tested without a production key.
+
 ## Features
 
 - Wallet connection with wagmi.

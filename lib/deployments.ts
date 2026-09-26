@@ -60,7 +60,7 @@ export const arcDeployments = arcMainnetDeployments;
 
 const testnetContractAddresses = new Set(
   Object.values(arcTestnetDeployments)
-    .filter((value): value is { address: string; blockNumber: number } => (
+    .filter((value) => (
       typeof value === 'object' && value !== null && 'address' in value
     ))
     .map((value) => value.address.toLowerCase()),
