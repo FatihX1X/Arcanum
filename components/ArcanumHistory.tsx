@@ -22,10 +22,10 @@ import { useAccount, usePublicClient } from 'wagmi';
 
 import { arcanumAgentsAbi, arcanumAgentsAddress, type AgentMessage } from '@/lib/agentsContract';
 import { arcanumBulkSenderAbi, arcanumBulkSenderAddress } from '@/lib/bulkContract';
-import { arcNetworkTestnet, transactionUrl } from '@/lib/chain';
+import { arcNetwork, transactionUrl } from '@/lib/chain';
 import { arcanumMessengerAbi, arcanumMessengerAddress, type ChainMessage } from '@/lib/contract';
 import { decryptMessage } from '@/lib/crypto';
-import { arcTestnetDeployments } from '@/lib/deployments';
+import { arcDeployments } from '@/lib/deployments';
 import {
   arcanumEscrowAbi,
   arcanumEscrowAddress,
@@ -98,7 +98,7 @@ const copy: Record<Language, HistoryCopy> = {
     search: 'Search address, content, hash or ID',
     loadMore: 'Load more',
     disconnected: 'Connect your wallet to view your history.',
-    wrongNetwork: 'Switch to Arc Testnet to load on-chain history.',
+    wrongNetwork: 'Switch to Arc to load on-chain history.',
     loading: 'Loading on-chain activity…',
     empty: 'No matching activity was found.',
     partial: 'Some history sources could not be loaded. Available records are shown below.',
@@ -137,7 +137,7 @@ const copy: Record<Language, HistoryCopy> = {
     search: 'Adres, içerik, hash veya ID ara',
     loadMore: 'Daha fazla yükle',
     disconnected: 'Geçmişinizi görmek için cüzdanınızı bağlayın.',
-    wrongNetwork: 'Zincir üstü geçmişi yüklemek için Arc Testnet ağına geçin.',
+    wrongNetwork: 'Zincir üstü geçmişi yüklemek için Arc ağına geçin.',
     loading: 'Zincir üstü hareketler yükleniyor…',
     empty: 'Eşleşen bir hareket bulunamadı.',
     partial: 'Bazı geçmiş kaynakları yüklenemedi. Erişilebilen kayıtlar aşağıda gösteriliyor.',
@@ -226,7 +226,7 @@ function normalizeMessages(
     channel: 'direct' | 'agent',
     direction: 'incoming' | 'outgoing',
   ): MessageHistoryItem => ({
-    id: `${arcNetworkTestnet.id}:${channel}:${direction}:${message.id}`,
+    id: `${arcNetwork.id}:${channel}:${direction}:${message.id}`,
     kind: 'message',
     timestamp: Number(message.timestamp) * 1000,
     status: 'confirmed',
@@ -264,14 +264,14 @@ async function loadBulk(client: PublicClient, account: `0x${string}`): Promise<B
       abi: arcanumBulkSenderAbi,
       eventName: 'BatchSent',
       args: { sender: account },
-      fromBlock: BigInt(arcTestnetDeployments.bulkSender.blockNumber),
+      fromBlock: BigInt(arcDeployments.bulkSender.blockNumber),
       toBlock: 'latest',
     })),
     withRpcRetry(() => client.getContractEvents({
       address: arcanumBulkSenderAddress,
       abi: arcanumBulkSenderAbi,
       eventName: 'TransferSent',
-      fromBlock: BigInt(arcTestnetDeployments.bulkSender.blockNumber),
+      fromBlock: BigInt(arcDeployments.bulkSender.blockNumber),
       toBlock: 'latest',
     })),
   ]);
@@ -286,7 +286,7 @@ async function loadBulk(client: PublicClient, account: `0x${string}`): Promise<B
       .sort((a, b) => Number(bigint(a.args.index) - bigint(b.args.index)))
       .map((item) => ({ address: address(item.args.recipient), amount: formatEther(bigint(item.args.amount)) }));
     return {
-      id: `${arcNetworkTestnet.id}:${log.transactionHash ?? 'bulk'}:${batchId}`,
+      id: `${arcNetwork.id}:${log.transactionHash ?? 'bulk'}:${batchId}`,
       kind: 'bulk',
       timestamp: getTimestamp(log.blockNumber),
       status: 'confirmed',
@@ -320,14 +320,14 @@ async function loadEscrow(client: PublicClient, account: `0x${string}`): Promise
       address: arcanumEscrowAddress,
       abi: arcanumEscrowAbi,
       eventName,
-      fromBlock: BigInt(arcTestnetDeployments.escrow.blockNumber),
+      fromBlock: BigInt(arcDeployments.escrow.blockNumber),
       toBlock: 'latest',
     })))),
     Promise.all(gigEventNames.map((eventName) => withRpcRetry(() => client.getContractEvents({
       address: arcanumGigBoardAddress,
       abi: arcanumGigBoardAbi,
       eventName,
-      fromBlock: BigInt(arcTestnetDeployments.gigBoard.blockNumber),
+      fromBlock: BigInt(arcDeployments.gigBoard.blockNumber),
       toBlock: 'latest',
     })))),
   ]);
@@ -351,7 +351,7 @@ async function loadEscrow(client: PublicClient, account: `0x${string}`): Promise
     const amountValue = log.args.amount != null ? bigint(log.args.amount) : record?.amount;
     const detailValue = log.args.evidenceURI ?? log.args.resolutionURI ?? log.args.resolutionHash;
     return {
-      id: `${arcNetworkTestnet.id}:${log.transactionHash ?? log.blockNumber}:${log.eventName}:${log.logIndex ?? 0}`,
+      id: `${arcNetwork.id}:${log.transactionHash ?? log.blockNumber}:${log.eventName}:${log.logIndex ?? 0}`,
       kind: 'escrow',
       timestamp: getTimestamp(log.blockNumber),
       status: 'confirmed',
@@ -382,7 +382,7 @@ async function loadSwaps(account: string, cursor?: string | null) {
 export default function ArcanumHistory({ language }: { language: Language }) {
   const t = copy[language];
   const { address: account, isConnected } = useAccount();
-  const client = usePublicClient({ chainId: arcNetworkTestnet.id });
+  const client = usePublicClient({ chainId: arcNetwork.id });
   const [tab, setTab] = useState<HistoryTab>('all');
   const [query, setQuery] = useState('');
   const [visible, setVisible] = useState(pageSize);

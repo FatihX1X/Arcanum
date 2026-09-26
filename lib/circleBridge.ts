@@ -2,10 +2,10 @@ import type { EstimateResult } from '@circle-fin/bridge-kit';
 
 import {
   arcBridgeChain,
-  bridgeChainByKey,
   isSupportedArcBridgeRoute,
+  type BridgeEvmChain,
   type BridgeChainKey,
-  type BridgeEvmTestnet,
+  bridgeChainByKey,
 } from './bridgeChains';
 import {
   formatSwapUnits,
@@ -122,8 +122,8 @@ export function assertBridgeEstimateIntegrity(
   expected: {
     account: string;
     amount: string;
-    source: BridgeEvmTestnet;
-    destination: BridgeEvmTestnet;
+    source: BridgeEvmChain;
+    destination: BridgeEvmChain;
   },
 ) {
   const normalized = normalizeSwapAmount(expected.amount);
@@ -159,6 +159,6 @@ export function chainPairFromKeys(source: BridgeChainKey, destination: BridgeCha
   return { source: sourceChain, destination: destinationChain };
 }
 
-export function isArcBridgeSource(chain: BridgeEvmTestnet) {
+export function isArcBridgeSource(chain: BridgeEvmChain) {
   return chain.chain === arcBridgeChain.chain;
 }

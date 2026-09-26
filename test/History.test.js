@@ -126,7 +126,7 @@ describe('Unified Arcanum history', function () {
         from: { hash: counterparty },
         to: { hash: account },
         total: { value: '9250000', decimals: '6' },
-        token: { address_hash: '0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a', symbol: 'EURC' },
+        token: { address_hash: '0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1', symbol: 'EURC' },
       },
     ];
     const result = history.netArcSwapTransfers(transfers, account);
@@ -142,8 +142,8 @@ describe('Unified Arcanum history', function () {
   });
 
   it('uses a versioned, chain and wallet scoped local storage key', function () {
-    expect(history.swapHistoryStorageKey(5042002, account.toUpperCase()))
-      .to.equal(`arcanum.history.v1:5042002:${account}`);
+    expect(history.swapHistoryStorageKey(5042, account.toUpperCase()))
+      .to.equal(`arcanum.history.v1:5042:${account}`);
   });
 
   it('scopes Bridge history to the wallet and deduplicates by bridge ID', function () {
@@ -157,10 +157,10 @@ describe('Unified Arcanum history', function () {
       timestamp: 100,
       status: 'pending',
       amount: '1',
-      sourceChain: 'Arc Testnet',
-      sourceChainId: 5042002,
-      destinationChain: 'Ethereum Sepolia',
-      destinationChainId: 11155111,
+      sourceChain: 'Arc',
+      sourceChainId: 5042,
+      destinationChain: 'Ethereum',
+      destinationChainId: 1,
       steps: [],
     };
     const completed = {
@@ -174,6 +174,6 @@ describe('Unified Arcanum history', function () {
     expect(result).to.have.length(1);
     expect(result[0].status).to.equal('confirmed');
     expect(history.filterHistory([completed], 'bridge')).to.deep.equal([completed]);
-    expect(history.filterHistory([completed], 'all', 'Ethereum Sepolia')).to.deep.equal([completed]);
+    expect(history.filterHistory([completed], 'all', 'Ethereum')).to.deep.equal([completed]);
   });
 });

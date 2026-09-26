@@ -27,3 +27,47 @@ export const arcTestnetDeployments = {
     blockNumber: 52109913,
   },
 } as const;
+
+export const arcMainnetDeployments = {
+  chainId: 5042,
+  messenger: {
+    address: '0xC0043A981650ed85ae89f1c2f60E826D39aC365e',
+    blockNumber: 21380701,
+  },
+  agents: {
+    address: '0x2AB26Cf3216852c89BcEea8AAd16e2b96E628108',
+    blockNumber: 21380704,
+  },
+  groups: {
+    address: '0x6bB716DB0bce5aFA206C93246d8764D17CE456aD',
+    blockNumber: 21380706,
+  },
+  bulkSender: {
+    address: '0xD0aFc0209547986D777CA345aE7ee5F8fcd741D7',
+    blockNumber: 21380709,
+  },
+  gigBoard: {
+    address: '0xE238054755B41cA6bDe7C848F9b3e92BCEE22b4A',
+    blockNumber: 21380711,
+  },
+  escrow: {
+    address: '0xf9DD777185da559aDadbf298092DE7e6A050a93E',
+    blockNumber: 21380714,
+  },
+} as const;
+
+export const arcDeployments = arcMainnetDeployments;
+
+const testnetContractAddresses = new Set(
+  Object.values(arcTestnetDeployments)
+    .filter((value): value is { address: string; blockNumber: number } => (
+      typeof value === 'object' && value !== null && 'address' in value
+    ))
+    .map((value) => value.address.toLowerCase()),
+);
+
+export function configuredAddress(envValue: string | undefined, mainnetAddress: string) {
+  const value = envValue?.trim();
+  if (!value || testnetContractAddresses.has(value.toLowerCase())) return mainnetAddress;
+  return value;
+}

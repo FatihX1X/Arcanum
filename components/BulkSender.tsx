@@ -4,7 +4,7 @@ import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, ExternalLink, FileUp, Loader2, Plus, Send, Trash2, WalletCards, X } from 'lucide-react';
 import { formatEther, isAddress, parseEther } from 'viem';
 import { useAccount, useBalance, useChainId, usePublicClient, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
-import { arcNetworkTestnet, transactionUrl } from '../lib/chain';
+import { arcNetwork, transactionUrl } from '../lib/chain';
 import { arcanumBulkSenderAbi, arcanumBulkSenderAddress, isArcanumBulkSenderConfigured } from '../lib/bulkContract';
 import type { Language } from './arcanumCopy';
 import { Modal } from './ui';
@@ -15,7 +15,7 @@ type PreparedRow = { address: `0x${string}`; amount: bigint };
 const text = {
   en: {
     eyebrow: 'USDC batch', title: 'Bulk Sender', body: 'Send Arc native USDC to up to 100 recipients in one atomic transaction.',
-    notConfigured: 'Bulk contract is not configured yet.', noWallet: 'Connect your wallet to prepare a batch.', wrongChain: 'Switch to Arc Testnet to send native USDC.',
+    notConfigured: 'Bulk contract is not configured yet.', noWallet: 'Connect your wallet to prepare a batch.', wrongChain: 'Switch to Arc to send native USDC.',
     recipient: 'Recipient', amount: 'USDC amount', add: 'Add recipient', import: 'Import CSV', paste: 'Paste address,amount rows',
     apply: 'Apply rows', total: 'Batch total', balance: 'Wallet balance', recipients: 'Recipients', review: 'Review batch',
     reviewTitle: 'Confirm atomic batch', atomic: 'If one recipient rejects the transfer, the complete transaction is reverted.',
@@ -25,7 +25,7 @@ const text = {
   },
   tr: {
     eyebrow: 'USDC batch', title: 'Toplu Gönderici', body: 'Arc native USDC’yi en fazla 100 alıcıya tek ve atomik işlemle gönderin.',
-    notConfigured: 'Bulk contract adresi henüz yapılandırılmadı.', noWallet: 'Batch hazırlamak için cüzdanınızı bağlayın.', wrongChain: 'Native USDC göndermek için Arc Testnet ağına geçin.',
+    notConfigured: 'Bulk contract adresi henüz yapılandırılmadı.', noWallet: 'Batch hazırlamak için cüzdanınızı bağlayın.', wrongChain: 'Native USDC göndermek için Arc ağına geçin.',
     recipient: 'Alıcı', amount: 'USDC tutarı', add: 'Alıcı ekle', import: 'CSV içe aktar', paste: 'address,amount satırlarını yapıştırın',
     apply: 'Satırları uygula', total: 'Batch toplamı', balance: 'Cüzdan bakiyesi', recipients: 'Alıcılar', review: 'Batch’i incele',
     reviewTitle: 'Atomik batch’i onayla', atomic: 'Bir alıcı transferi reddederse işlemin tamamı geri alınır.',
@@ -87,12 +87,12 @@ export default function BulkSender({ language }: { language: Language }) {
   const copy = text[language];
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
-  const isCorrectChain = chainId === arcNetworkTestnet.id;
-  const balance = useBalance({ address, chainId: arcNetworkTestnet.id, query: { enabled: Boolean(address) } });
-  const publicClient = usePublicClient({ chainId: arcNetworkTestnet.id });
+  const isCorrectChain = chainId === arcNetwork.id;
+  const balance = useBalance({ address, chainId: arcNetwork.id, query: { enabled: Boolean(address) } });
+  const publicClient = usePublicClient({ chainId: arcNetwork.id });
   const { writeContractAsync, isPending: walletPending } = useWriteContract();
   const [hash, setHash] = useState<`0x${string}` | undefined>();
-  const receipt = useWaitForTransactionReceipt({ hash, chainId: arcNetworkTestnet.id });
+  const receipt = useWaitForTransactionReceipt({ hash, chainId: arcNetwork.id });
   const [rows, setRows] = useState<Row[]>([newRow(), newRow()]);
   const [paste, setPaste] = useState('');
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -177,7 +177,7 @@ export default function BulkSender({ language }: { language: Language }) {
         functionName: 'batchSend',
         args: [prepared.prepared.map((row) => row.address), prepared.prepared.map((row) => row.amount)],
         value: prepared.total,
-        chainId: arcNetworkTestnet.id,
+        chainId: arcNetwork.id,
       });
       setHash(nextHash);
       setStatus(copy.pending);

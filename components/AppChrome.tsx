@@ -86,6 +86,10 @@ export function AppHeader({
           <span>{language.toUpperCase()}</span>
         </Button>
 
+        {isConnected && isCorrectChain ? (
+          <Badge tone="success" icon={<Wifi size={12} />}>{t.header.ready}</Badge>
+        ) : null}
+
         {!isCorrectChain && isConnected ? (
           <>
             <Badge tone="warning" icon={<Wifi size={12} />}>{t.header.wrong}</Badge>

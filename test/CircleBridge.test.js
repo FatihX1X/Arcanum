@@ -22,25 +22,30 @@ function loadTypeScriptModule(relativePath) {
   return require(filename);
 }
 
-describe('Circle Bridge safeguards', function () {
+describe('Circle Bridge safeguards (Arc mainnet)', function () {
   const chains = loadTypeScriptModule('lib/bridgeChains.ts');
   const bridge = loadTypeScriptModule('lib/circleBridge.ts');
   const rpcProxy = loadTypeScriptModule('lib/rpcProxy.ts');
   const account = '0x1111111111111111111111111111111111111111';
 
-  it('exposes only EVM testnets and requires exactly one Arc endpoint', function () {
-    expect(chains.bridgeEvmTestnets).to.have.length.greaterThan(2);
-    expect(chains.bridgeEvmTestnets.every((chain) => chain.type === 'evm' && chain.isTestnet)).to.equal(true);
+  it('exposes only EVM mainnets and requires exactly one Arc endpoint', function () {
+    expect(chains.bridgeEvmChains).to.have.length.greaterThan(2);
+    expect(chains.arcBridgeChain.chain).to.equal('Arc');
+    expect(chains.arcBridgeChain.chainId).to.equal(5042);
+    expect(chains.arcBridgeChain.isTestnet).to.equal(false);
+    expect(chains.defaultBridgeCounterpart.chain).to.equal('Ethereum');
+    expect(chains.bridgeEvmChains.every((chain) => chain.type === 'evm' && chain.isTestnet === false)).to.equal(true);
     expect(chains.isSupportedArcBridgeRoute(chains.arcBridgeChain, chains.defaultBridgeCounterpart)).to.equal(true);
     expect(chains.isSupportedArcBridgeRoute(chains.defaultBridgeCounterpart, chains.arcBridgeChain)).to.equal(true);
     expect(chains.isSupportedArcBridgeRoute(chains.arcBridgeChain, chains.arcBridgeChain)).to.equal(false);
   });
 
-  it('limits Arc destinations to Circle Forwarder-supported testnets', function () {
+  it('limits Arc destinations to Circle Forwarder-supported mainnets', function () {
     const destinations = chains.bridgeDestinationsFor(chains.arcBridgeChain);
     expect(destinations).to.not.be.empty;
     expect(destinations.every((chain) => (
       chain.chain !== chains.arcBridgeChain.chain
+      && chain.isTestnet === false
       && chain.cctp.forwarderSupported.destination
     ))).to.equal(true);
     expect(chains.bridgeDestinationsFor(chains.defaultBridgeCounterpart)).to.deep.equal([chains.arcBridgeChain]);
@@ -62,7 +67,7 @@ describe('Circle Bridge safeguards', function () {
   });
 
   it('keeps browser RPC traffic on a whitelisted same-origin proxy', function () {
-    expect(rpcProxy.rpcProxyPath(5042002)).to.equal('/api/rpc/5042002');
+    expect(rpcProxy.rpcProxyPath(5042)).to.equal('/api/rpc/5042');
     expect(rpcProxy.isSafeJsonRpcPayload({
       jsonrpc: '2.0',
       id: 1,

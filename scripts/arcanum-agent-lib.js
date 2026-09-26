@@ -4,18 +4,19 @@ const { homedir } = require('node:os');
 const { dirname, resolve } = require('node:path');
 const { createPublicClient, formatEther, getAddress, http, isAddress, parseEther } = require('viem');
 
-const ARC_TESTNET = {
-  id: 5042002,
-  name: 'Arc Testnet',
+const ARC = {
+  id: 5042,
+  name: 'Arc',
   nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
-  rpcUrls: { default: { http: ['https://rpc.testnet.arc.network'] } },
+  rpcUrls: { default: { http: ['https://rpc.mainnet.arc.io'] } },
 };
+const ARC_TESTNET = ARC;
 
 const DEFAULTS = {
-  rpcUrl: 'https://rpc.testnet.arc.network',
-  agentsAddress: '0x357096A24F914A178F04B7175837a2f969C42eCA',
-  gigBoardAddress: '0x595f7d521e30dd8FDD9E0130e778ce1E63e909A0',
-  escrowAddress: '0x993d0903f45376c0746572Af69f9577179A2A350',
+  rpcUrl: 'https://rpc.mainnet.arc.io',
+  agentsAddress: '0x2AB26Cf3216852c89BcEea8AAd16e2b96E628108',
+  gigBoardAddress: '0xE238054755B41cA6bDe7C848F9b3e92BCEE22b4A',
+  escrowAddress: '0xf9DD777185da559aDadbf298092DE7e6A050a93E',
 };
 
 const agentsAbi = [
@@ -92,7 +93,7 @@ function toUint(value, label) {
 }
 
 function createRunner({ config = readConfig(), runCircle, client, confirm } = {}) {
-  const publicClient = client || createPublicClient({ chain: ARC_TESTNET, transport: http(config.rpcUrl) });
+  const publicClient = client || createPublicClient({ chain: ARC, transport: http(config.rpcUrl) });
   const executeCircle = runCircle || ((args) => execFileSync('circle', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }));
 
   async function circle(args) {
@@ -213,7 +214,7 @@ function createRunner({ config = readConfig(), runCircle, client, confirm } = {}
     if (proposal.status !== 1) throw new Error('Only accepted proposals can be funded.');
     if (!sameAddress(address, proposal.payer)) throw new Error('Only the proposal payer can fund this escrow.');
     const balance = await publicClient.getBalance({ address });
-    if (balance < proposal.amount) throw new Error(`Insufficient Arc Testnet USDC. Required: ${formatEther(proposal.amount)} USDC.`);
+    if (balance < proposal.amount) throw new Error(`Insufficient Arc USDC. Required: ${formatEther(proposal.amount)} USDC.`);
     const summary = { proposalId: id, payer: proposal.payer, provider: proposal.provider, arbiter: proposal.arbiter, amount: proposal.amount };
     const accepted = approve || (confirm ? await confirm(summary) : false);
     if (!accepted) return { cancelled: true, address, ...summary };
@@ -224,4 +225,4 @@ function createRunner({ config = readConfig(), runCircle, client, confirm } = {}
   return { config, status, register, setActive, sendPublicMessage, acceptEscrow, fundEscrow };
 }
 
-module.exports = { ARC_TESTNET, DEFAULTS, configPath, readConfig, writeConfig, parseCircleJson, findWalletAddress, createRunner };
+module.exports = { ARC, ARC_TESTNET, DEFAULTS, configPath, readConfig, writeConfig, parseCircleJson, findWalletAddress, createRunner };

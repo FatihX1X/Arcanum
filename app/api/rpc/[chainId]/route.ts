@@ -1,10 +1,16 @@
 import { NextRequest } from 'next/server';
 
 import { bridgeChainById } from '@/lib/bridgeChains';
+import { arcNetwork } from '@/lib/chain';
 import { isSafeJsonRpcPayload, rpcProxyBodyLimit } from '@/lib/rpcProxy';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+function rpcUrlFor(chainId: number) {
+  if (chainId === arcNetwork.id) return arcNetwork.rpcUrls.default.http[0];
+  return bridgeChainById.get(chainId)?.rpcEndpoints[0];
+}
 
 export async function POST(
   request: NextRequest,
@@ -15,8 +21,8 @@ export async function POST(
     return Response.json({ error: 'Invalid chain ID.' }, { status: 400 });
   }
 
-  const chain = bridgeChainById.get(Number(rawChainId));
-  if (!chain) {
+  const rpcUrl = rpcUrlFor(Number(rawChainId));
+  if (!rpcUrl) {
     return Response.json({ error: 'Unsupported chain.' }, { status: 404 });
   }
 
@@ -41,7 +47,7 @@ export async function POST(
   }
 
   try {
-    const upstream = await fetch(chain.rpcEndpoints[0], {
+    const upstream = await fetch(rpcUrl, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body,

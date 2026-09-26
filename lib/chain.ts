@@ -1,46 +1,46 @@
 import { defineChain } from 'viem';
 
-const fallbackRpcUrl = 'https://rpc.mainnet.arc.io';
-const fallbackExplorerUrl = 'https://explorer.arc.io';
-
-export const arcNetworkTestnet = defineChain({
-  id: Number(process.env.NEXT_PUBLIC_CHAIN_ID || 5042),
-  name: process.env.NEXT_PUBLIC_CHAIN_NAME || 'Arc',
+export const arcNetwork = defineChain({
+  id: 5042,
+  name: 'Arc Mainnet',
   nativeCurrency: {
     decimals: 18,
-    name: process.env.NEXT_PUBLIC_NATIVE_CURRENCY_NAME || 'USDC',
-    symbol: process.env.NEXT_PUBLIC_NATIVE_CURRENCY_SYMBOL || 'USDC',
+    name: 'USDC',
+    symbol: 'USDC',
   },
   rpcUrls: {
     default: {
-      http: [process.env.NEXT_PUBLIC_RPC_URL || fallbackRpcUrl],
+      http: ['https://rpc.mainnet.arc.io'],
     },
     public: {
-      http: [process.env.NEXT_PUBLIC_RPC_URL || fallbackRpcUrl],
+      http: ['https://rpc.mainnet.arc.io'],
     },
   },
   blockExplorers: {
     default: {
-      name: process.env.NEXT_PUBLIC_EXPLORER_NAME || 'Arc Explorer',
-      url: process.env.NEXT_PUBLIC_EXPLORER_URL || fallbackExplorerUrl,
+      name: 'Arc Explorer',
+      url: 'https://explorer.arc.io',
     },
   },
   testnet: false,
 });
 
 export function arcAddEthereumChainParams() {
-  const explorerUrl = arcNetworkTestnet.blockExplorers?.default.url;
+  const explorerUrl = arcNetwork.blockExplorers?.default.url;
 
   return {
-    chainId: `0x${arcNetworkTestnet.id.toString(16)}`,
-    chainName: arcNetworkTestnet.name,
-    nativeCurrency: arcNetworkTestnet.nativeCurrency,
-    rpcUrls: [...arcNetworkTestnet.rpcUrls.default.http],
+    chainId: `0x${arcNetwork.id.toString(16)}`,
+    chainName: arcNetwork.name,
+    nativeCurrency: arcNetwork.nativeCurrency,
+    rpcUrls: [...arcNetwork.rpcUrls.default.http],
     blockExplorerUrls: explorerUrl ? [explorerUrl] : undefined,
   };
 }
 
-export function transactionUrl(hash: string) {
-  const baseUrl = arcNetworkTestnet.blockExplorers?.default.url.replace(/\/$/, '');
+export function transactionUrl(
+  hash: string,
+  chain: { blockExplorers?: { default: { url: string } } } = arcNetwork,
+) {
+  const baseUrl = chain.blockExplorers?.default.url.replace(/\/$/, '');
   return baseUrl ? `${baseUrl}/tx/${hash}` : undefined;
 }
