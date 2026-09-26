@@ -1,11 +1,11 @@
 import { defineChain } from 'viem';
 
-const fallbackRpcUrl = 'https://rpc.testnet.arc.network';
-const fallbackExplorerUrl = 'https://testnet.arcscan.app';
+const fallbackRpcUrl = 'https://rpc.mainnet.arc.io';
+const fallbackExplorerUrl = 'https://explorer.arc.io';
 
 export const arcNetworkTestnet = defineChain({
-  id: Number(process.env.NEXT_PUBLIC_CHAIN_ID || 5042002),
-  name: process.env.NEXT_PUBLIC_CHAIN_NAME || 'Arc Testnet',
+  id: Number(process.env.NEXT_PUBLIC_CHAIN_ID || 5042),
+  name: process.env.NEXT_PUBLIC_CHAIN_NAME || 'Arc',
   nativeCurrency: {
     decimals: 18,
     name: process.env.NEXT_PUBLIC_NATIVE_CURRENCY_NAME || 'USDC',
@@ -21,11 +21,11 @@ export const arcNetworkTestnet = defineChain({
   },
   blockExplorers: {
     default: {
-      name: process.env.NEXT_PUBLIC_EXPLORER_NAME || 'ArcScan',
+      name: process.env.NEXT_PUBLIC_EXPLORER_NAME || 'Arc Explorer',
       url: process.env.NEXT_PUBLIC_EXPLORER_URL || fallbackExplorerUrl,
     },
   },
-  testnet: true,
+  testnet: false,
 });
 
 export function arcAddEthereumChainParams() {

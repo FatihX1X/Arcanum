@@ -7,7 +7,6 @@ import {
   BookOpen,
   Bot,
   FileKey2,
-  Github,
   HelpCircle,
   History,
   Info,
@@ -33,8 +32,7 @@ export type ThemeMode = 'light' | 'dark';
 
 type Copy = (typeof copy)[Language];
 
-const xProfileUrl = 'https://x.com/0xFatih';
-const githubRepoUrl = 'https://github.com/FatihX1X/Arcanum';
+const xProfileUrl = 'https://x.com/ArcanumChat';
 
 function short(address: string) {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
@@ -133,11 +131,7 @@ export function AppFooter() {
       <div className="flex items-center gap-1">
         <a href={xProfileUrl} target="_blank" rel="noreferrer" className="btn-subtle h-9 px-3 text-xs">
           <span className="font-semibold">X</span>
-          0xFatih
-        </a>
-        <a href={githubRepoUrl} target="_blank" rel="noreferrer" className="btn-subtle h-9 px-3 text-xs">
-          <Github size={14} />
-          GitHub
+          ArcanumChat
         </a>
       </div>
     </footer>

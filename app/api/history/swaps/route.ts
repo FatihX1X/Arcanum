@@ -5,7 +5,7 @@ import { netArcSwapTransfers } from '@/lib/history';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-const arcScanApi = 'https://testnet.arcscan.app/api/v2';
+const arcScanApi = 'https://explorer.arc.io/api/v2';
 const maximumPagesPerRequest = 3;
 
 type ArcScanResponse = {
