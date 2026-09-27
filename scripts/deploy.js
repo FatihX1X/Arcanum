@@ -1,6 +1,7 @@
 const hre = require('hardhat');
 
 async function main() {
+  await require('./deployment-safety').requireMissing(hre, ['messenger']);
   const Messenger = await hre.ethers.getContractFactory('ArcanumMessenger');
   const messenger = await Messenger.deploy();
 

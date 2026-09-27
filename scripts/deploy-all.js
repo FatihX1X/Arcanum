@@ -14,6 +14,7 @@ async function deploy(name, ...args) {
 }
 
 async function main() {
+  await require('./deployment-safety').requireMissing(hre, ['messenger', 'agents', 'groups', 'bulkSender', 'gigBoard', 'escrow']);
   const [deployer] = await hre.ethers.getSigners();
   if (!deployer) {
     throw new Error('DEPLOYER_PRIVATE_KEY is required');

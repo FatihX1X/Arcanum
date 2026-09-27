@@ -1,7 +1,8 @@
 const hre = require('hardhat');
 
 async function main() {
-  const keyRegistry = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '0x5b713DB5623d640a2E6c6eA0f002F229191E5DBB';
+  await require('./deployment-safety').requireMissing(hre, ['groups']);
+  const keyRegistry = await require('./deployment-safety').groupRegistry(hre);
   const Groups = await hre.ethers.getContractFactory('ArcanumGroups');
   const groups = await Groups.deploy(keyRegistry);
   await groups.waitForDeployment();

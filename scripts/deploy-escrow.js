@@ -1,6 +1,7 @@
 const hre = require('hardhat');
 
 async function main() {
+  await require('./deployment-safety').requireMissing(hre, ['gigBoard', 'escrow']);
   const Board = await hre.ethers.getContractFactory('ArcanumGigBoard');
   const board = await Board.deploy();
   await board.waitForDeployment();

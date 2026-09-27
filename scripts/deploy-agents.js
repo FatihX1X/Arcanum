@@ -1,6 +1,7 @@
 const hre = require('hardhat');
 
 async function main() {
+  await require('./deployment-safety').requireMissing(hre, ['agents']);
   const Agents = await hre.ethers.getContractFactory('ArcanumAgents');
   const agents = await Agents.deploy();
 

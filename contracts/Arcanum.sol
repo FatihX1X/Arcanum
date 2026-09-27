@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+// Legacy prototype. The application and deployment suite use ArcanumMessenger.
+// Do not deploy this prototype as an additional production service.
 contract Arcanum {
     struct Message {
         address sender;
         address receiver;
         bytes ciphertext;      // Şifreli mesaj içeriği
         uint256 timestamp;
-        uint256 nonce;         // Replay attack koruması
+        uint256 nonce;         // Client metadata only; uniqueness is not enforced.
     }
 
     // Her kullanıcının public key'i (X25519)

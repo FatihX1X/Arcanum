@@ -70,6 +70,8 @@ import { copy, type Language } from './arcanumCopy';
 import { Badge, EmptyState, Modal, cx } from './ui';
 import BridgeErrorBoundary from './BridgeErrorBoundary';
 
+const CircleOnramp = dynamic(() => import('./CircleOnramp'), { ssr: false });
+
 const CircleSwap = dynamic(() => import('./CircleSwap'), {
   ssr: false,
   loading: () => (
@@ -351,7 +353,7 @@ export default function WalletConnect() {
   }, [refreshLocalKeyStatus]);
 
   useEffect(() => {
-    if (!isConnected || !address || isCorrectChain || view === 'bridge' || autoSwitchedFor === address) {
+    if (!isConnected || !address || isCorrectChain || view === 'bridge' || view === 'onramp' || autoSwitchedFor === address) {
       return;
     }
 
@@ -609,7 +611,7 @@ export default function WalletConnect() {
         language={language}
         isConnected={isConnected}
         address={address}
-        isCorrectChain={view === 'bridge' ? bridgeChainById.has(chainId) : isCorrectChain}
+        isCorrectChain={view === 'onramp' || (view === 'bridge' ? bridgeChainById.has(chainId) : isCorrectChain)}
         isConnectPending={isConnectPending}
         isSwitchPending={isSwitchPending}
         menuOpen={menuOpen}
@@ -715,6 +717,7 @@ export default function WalletConnect() {
         {view === 'bulk' ? <BulkSender language={language} /> : null}
 
         {view === 'swap' ? <CircleSwap language={language} /> : null}
+        {view === 'onramp' ? <CircleOnramp language={language} /> : null}
 
         {view === 'bridge' ? (
           <BridgeErrorBoundary language={language}>

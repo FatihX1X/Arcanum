@@ -14,17 +14,25 @@
     "test:frontend": "hardhat test test/CryptoSecurity.test.js test/RpcResilience.test.js test/CircleSwap.test.js test/CircleBridge.test.js test/History.test.js",
     "deploy": "hardhat run scripts/deploy.js --network arcTestnet",
     "deploy:arc": "hardhat run scripts/deploy.js --network arcTestnet",
+    "deploy:mainnet": "hardhat run scripts/deploy-all.js --network arcMainnet",
+    "deploy:mainnet:all": "hardhat run scripts/deploy-mainnet-suite.js --network arcMainnet",
+    "deploy:mainnet:agents": "hardhat run scripts/deploy-agents.js --network arcMainnet",
+    "deploy:mainnet:groups": "hardhat run scripts/deploy-groups.js --network arcMainnet",
+    "deploy:mainnet:bulk": "hardhat run scripts/deploy-bulk.js --network arcMainnet",
+    "deploy:mainnet:escrow": "hardhat run scripts/deploy-escrow.js --network arcMainnet",
     "deploy:agents": "hardhat run scripts/deploy-agents.js --network arcTestnet",
     "deploy:groups": "hardhat run scripts/deploy-groups.js --network arcTestnet",
     "deploy:bulk": "hardhat run scripts/deploy-bulk.js --network arcTestnet",
     "deploy:escrow": "hardhat run scripts/deploy-escrow.js --network arcTestnet",
     "deploy:all": "hardhat run scripts/deploy-all.js --network arcTestnet",
-    "deploy:mainnet": "hardhat run scripts/deploy-all.js --network arcMainnet",
     "fees:balance": "hardhat run scripts/fees-balance.js --network arcTestnet",
-    "fees:claim": "hardhat run scripts/fees-claim.js --network arcTestnet"
+    "fees:claim": "hardhat run scripts/fees-claim.js --network arcTestnet",
+    "deploy:mainnet:messenger": "hardhat run scripts/deploy.js --network arcMainnet",
+    "audit:mainnet": "hardhat compile && node scripts/audit-mainnet.js"
   },
   "dependencies": {
     "@circle-fin/adapter-viem-v2": "^1.18.0",
+    "@circle-fin/app-kit": "1.15.3",
     "@circle-fin/bridge-kit": "^1.15.1",
     "@circle-fin/swap-kit": "^1.7.0",
     "@noble/curves": "^1.7.0",
@@ -32,7 +40,7 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.441.0",
-    "next": "15.5.20",
+    "next": "15.5.26",
     "react": "^19.1.2",
     "react-dom": "^19.1.2",
     "tailwind-merge": "^2.5.2",
@@ -46,7 +54,7 @@
     "@types/react": "^19.1.16",
     "@types/react-dom": "^19.1.9",
     "eslint": "^9",
-    "eslint-config-next": "15.5.20",
+    "eslint-config-next": "15.5.26",
     "hardhat": "^2.22.17",
     "postcss": "^8",
     "tailwindcss": "^3.4.0",
@@ -56,6 +64,6 @@
     "lodash": "4.18.1"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   }
 }
