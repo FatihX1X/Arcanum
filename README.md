@@ -14,7 +14,7 @@ unavailable until these server-only Vercel Production variables are configured:
 
 - `CIRCLE_API_KEY`: Circle production key (never a `NEXT_PUBLIC_` variable).
 - `ONRAMP_AUTH_SECRET`: independently generated random secret of at least 32 characters.
-- `ONRAMP_ORIGIN`: exact HTTPS origin, e.g. `https://arcanumchat.xyz`, without a trailing slash.
+- `ONRAMP_ORIGIN`: exact canonical HTTPS origin, `https://www.arcanumchat.xyz`, without a trailing slash.
 
 Redeploy after configuration. Register the hostname with Circle and complete KYB
 for card/Apple Pay/Google Pay access. Production widgets cannot be tested on localhost.
