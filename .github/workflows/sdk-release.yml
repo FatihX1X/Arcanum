@@ -1,0 +1,33 @@
+name: Publish SDK
+
+on:
+  push:
+    tags:
+      - sdk-v*
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    if: startsWith(github.ref_name, 'sdk-v')
+    runs-on: ubuntu-latest
+    environment: npm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          cache: npm
+      - run: npm ci
+      - run: npm run sdk:check-generated
+      - run: npm run sdk:typecheck
+      - run: npm run sdk:test
+      - run: npm run sdk:build
+      - run: npm run sdk:smoke
+      - name: Verify tag matches package version
+        shell: bash
+        run: test "${GITHUB_REF_NAME}" = "sdk-v$(node -p "require('./packages/sdk/package.json').version")"
+      - run: npm publish --workspace arcanum-chat-sdk --access public --provenance

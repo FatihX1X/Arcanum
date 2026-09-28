@@ -2,9 +2,13 @@
   "name": "arcanum",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
+    "predev": "npm run sdk:build",
     "dev": "next dev",
-    "build": "next build",
+    "build": "npm run sdk:build && next build",
     "start": "next start",
     "lint": "eslint app components lib --max-warnings=0",
     "compile:contracts": "hardhat compile",
@@ -28,7 +32,14 @@
     "fees:balance": "hardhat run scripts/fees-balance.js --network arcTestnet",
     "fees:claim": "hardhat run scripts/fees-claim.js --network arcTestnet",
     "deploy:mainnet:messenger": "hardhat run scripts/deploy.js --network arcMainnet",
-    "audit:mainnet": "hardhat compile && node scripts/audit-mainnet.js"
+    "audit:mainnet": "hardhat compile && node scripts/audit-mainnet.js",
+    "sdk:generate": "hardhat compile && node scripts/generate-sdk-contracts.js",
+    "sdk:check-generated": "hardhat compile && node scripts/generate-sdk-contracts.js --check",
+    "sdk:typecheck": "npm run typecheck --workspace arcanum-chat-sdk",
+    "sdk:test": "npm test --workspace arcanum-chat-sdk",
+    "sdk:build": "npm run build --workspace arcanum-chat-sdk",
+    "sdk:pack": "npm pack --workspace arcanum-chat-sdk",
+    "sdk:smoke": "node scripts/smoke-sdk-package.js"
   },
   "dependencies": {
     "@circle-fin/adapter-viem-v2": "^1.18.0",
@@ -41,6 +52,7 @@
     "clsx": "^2.1.1",
     "lucide-react": "^0.441.0",
     "next": "15.5.26",
+    "arcanum-chat-sdk": "0.1.0",
     "react": "^19.1.2",
     "react-dom": "^19.1.2",
     "tailwind-merge": "^2.5.2",

@@ -11,6 +11,7 @@ out/
 broadcast/
 build/
 artifacts/
+packages/sdk/dist/
 
 # Misc
 .DS_Store

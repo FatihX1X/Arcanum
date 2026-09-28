@@ -1,0 +1,62 @@
+{
+  "name": "arcanum-chat-sdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for the Arcanum messaging, agent, group, bulk transfer, gig board, and escrow contracts on Arc mainnet.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./contracts": {
+      "types": "./dist/contracts.d.ts",
+      "import": "./dist/contracts.js",
+      "require": "./dist/contracts.cjs"
+    },
+    "./crypto": {
+      "types": "./dist/crypto.d.ts",
+      "import": "./dist/crypto.js",
+      "require": "./dist/crypto.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "peerDependencies": {
+    "viem": ">=2.56.0 <3"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts src/contracts.ts src/crypto.ts --format esm,cjs --dts --clean --sourcemap",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.4",
+    "tsup": "^8.5.0",
+    "typescript": "^5.5.4",
+    "viem": "^2.56.7",
+    "vitest": "^3.2.4"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/FatihX1X/Arcanum.git",
+    "directory": "packages/sdk"
+  },
+  "homepage": "https://github.com/FatihX1X/Arcanum/tree/main/packages/sdk",
+  "bugs": "https://github.com/FatihX1X/Arcanum/issues"
+}

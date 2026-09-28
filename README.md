@@ -2,6 +2,29 @@
 
 A private on-chain messenger for Arc Network.
 
+## ArcanumSDK
+
+The framework-independent SDK lives in `packages/sdk` and is published as
+`arcanum-chat-sdk`. It exposes typed Viem clients for all six Arc mainnet
+contracts plus an SSR-safe crypto entry point for private messages, groups,
+and escrow conversations.
+
+```bash
+npm install arcanum-chat-sdk viem
+```
+
+```ts
+import { createPublicClient, http } from 'viem';
+import { arcMainnet, createArcanumSdk } from 'arcanum-chat-sdk';
+
+const publicClient = createPublicClient({ chain: arcMainnet, transport: http() });
+const arcanum = createArcanumSdk({ publicClient });
+const gigs = await arcanum.gigBoard.read('getGigsPage', [0n, 25n]);
+```
+
+Run `npm run sdk:check-generated` after changing a contract or mainnet
+deployment. See `packages/sdk/README.md` for wallet writes and encryption flows.
+
 ## Mainnet audit and Circle Onramp
 
 All six active contracts have a mainnet manifest in `deployments/arcMainnet.json`.
