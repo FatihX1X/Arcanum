@@ -1,0 +1,25 @@
+name: SDK CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run sdk:check-generated
+      - run: npm run sdk:typecheck
+      - run: npm run sdk:test
+      - run: npm run sdk:build
+      - run: npm run sdk:smoke
+      - run: npm run lint
+      - run: npm run test:frontend
+      - run: npm run build

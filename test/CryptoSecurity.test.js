@@ -32,7 +32,7 @@ function loadCryptoModule() {
   global.atob = (value) => Buffer.from(value, 'base64').toString('binary');
   global.localStorage = createLocalStorage();
 
-  const filename = path.join(__dirname, '..', 'lib', 'crypto.ts');
+  const filename = path.join(__dirname, '..', 'packages', 'sdk', 'src', 'crypto.ts');
   const source = fs.readFileSync(filename, 'utf8');
   const output = ts.transpileModule(source, {
     compilerOptions: {

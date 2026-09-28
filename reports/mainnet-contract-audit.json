@@ -1,8 +1,8 @@
 {
   "chainId": 5042,
-  "blockNumber": 22849039,
-  "blockHash": "0x244fa00f8f9f71ce653491ca9fc4da91b90205b8a322f8ca05dcf90996ed7833",
-  "checkedAt": "2026-09-26T11:12:36.205Z",
+  "blockNumber": 23225022,
+  "blockHash": "0x09f089c220be39eacd594f0d039b7b3a60ca9b4d367c287a172dc43ccc9da0aa",
+  "checkedAt": "2026-09-28T16:13:14.375Z",
   "contracts": {
     "messenger": {
       "address": "0xC0043A981650ed85ae89f1c2f60E826D39aC365e",
