@@ -176,4 +176,25 @@ describe('Unified Arcanum history', function () {
     expect(history.filterHistory([completed], 'bridge')).to.deep.equal([completed]);
     expect(history.filterHistory([completed], 'all', 'Ethereum')).to.deep.equal([completed]);
   });
+
+  it('reconciles Earn receipts without resubmitting and isolates accounts', async function () {
+    const storage = new Map();
+    const previousWindow = global.window;
+    global.window = { localStorage: { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) } };
+    try {
+      const record = { id: 'earn:1', kind: 'earn', action: 'deposit', account, chainId: 5042, vaultAddress: counterparty, vaultName: 'Morpho USDC', amount: '10', asset: 'USDC', timestamp: 100, status: 'pending', txHash };
+      history.saveLocalEarnHistory(record);
+      expect(history.readLocalEarnHistory(counterparty)).to.deep.equal([]);
+      await history.reconcileLocalEarnHistory(account, async () => { throw new Error('Receipt not found'); });
+      expect(history.readLocalEarnHistory(account)[0].status).to.equal('pending');
+      await history.reconcileLocalEarnHistory(account, async () => ({ status: 'success' }));
+      expect(history.readLocalEarnHistory(account)[0].status).to.equal('confirmed');
+      history.saveLocalEarnHistory({ ...record, status: 'pending' });
+      await history.reconcileLocalEarnHistory(account, async () => ({ status: 'reverted' }));
+      expect(history.readLocalEarnHistory(account)).to.have.length(1);
+      expect(history.readLocalEarnHistory(account)[0].status).to.equal('failed');
+      expect(history.filterHistory(history.readLocalEarnHistory(account), 'earn')).to.have.length(1);
+      expect(history.filterHistory(history.readLocalEarnHistory(account), 'all', 'Morpho')).to.have.length(1);
+    } finally { if (previousWindow === undefined) delete global.window; else global.window = previousWindow; }
+  });
 });

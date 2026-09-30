@@ -36,6 +36,7 @@ import {
 import {
   filterHistory,
   readLocalBridgeHistory,
+  reconcileLocalEarnHistory,
   readLocalSwapHistory,
   sortAndDedupeHistory,
   type BulkHistoryItem,
@@ -93,7 +94,7 @@ const copy: Record<Language, HistoryCopy> = {
   en: {
     eyebrow: 'History',
     title: 'Activity history',
-    tabs: { all: 'All', incoming: 'Incoming', outgoing: 'Outgoing', swap: 'Swap', bridge: 'Bridge', escrow: 'Escrow', bulk: 'Bulk Sender' },
+    tabs: { all: 'All', incoming: 'Incoming', outgoing: 'Outgoing', swap: 'Swap', bridge: 'Bridge', escrow: 'Escrow', bulk: 'Bulk Sender', earn: 'Earn' },
     refresh: 'Refresh',
     search: 'Search address, content, hash or ID',
     loadMore: 'Load more',
@@ -132,7 +133,7 @@ const copy: Record<Language, HistoryCopy> = {
   tr: {
     eyebrow: 'Geçmiş',
     title: 'İşlem geçmişi',
-    tabs: { all: 'Genel', incoming: 'Gelen Mesaj', outgoing: 'Giden Mesaj', swap: 'Swap', bridge: 'Bridge', escrow: 'Escrow', bulk: 'Bulk Sender' },
+    tabs: { all: 'Genel', incoming: 'Gelen Mesaj', outgoing: 'Giden Mesaj', swap: 'Swap', bridge: 'Bridge', escrow: 'Escrow', bulk: 'Bulk Sender', earn: 'Earn' },
     refresh: 'Yenile',
     search: 'Adres, içerik, hash veya ID ara',
     loadMore: 'Daha fazla yükle',
@@ -405,7 +406,8 @@ export default function ArcanumHistory({ language }: { language: Language }) {
       loadEscrow(client, account).then((value) => ({ value, error: null })).catch((error: unknown) => ({ value: [] as EscrowHistoryItem[], error })),
       loadSwaps(account).then((value) => ({ value, error: null })).catch((error: unknown) => ({ value: null, error })),
     ]);
-    const next: HistoryItem[] = [...localSwaps, ...localBridges];
+    const earnRecords = await reconcileLocalEarnHistory(account, hash => client.getTransactionReceipt({ hash }));
+    const next: HistoryItem[] = [...localSwaps, ...localBridges, ...earnRecords];
     next.push(...messagesResult.value, ...bulkResult.value, ...escrowResult.value);
     if (swaps.value) {
       next.push(...swaps.value.items);
@@ -452,6 +454,7 @@ export default function ArcanumHistory({ language }: { language: Language }) {
     bridge: filterHistory(items, 'bridge').length,
     escrow: filterHistory(items, 'escrow').length,
     bulk: filterHistory(items, 'bulk').length,
+    earn: filterHistory(items, 'earn').length,
   }), [items]);
 
   async function loadMore() {
@@ -477,6 +480,7 @@ export default function ArcanumHistory({ language }: { language: Language }) {
     { id: 'bridge', icon: <Milestone size={15} /> },
     { id: 'escrow', icon: <ShieldCheck size={15} /> },
     { id: 'bulk', icon: <Layers3 size={15} /> },
+    { id: 'earn', icon: <ArrowUpRight size={15} /> },
   ];
 
   return (
@@ -551,7 +555,7 @@ function HistoryCard({ item, account, language, t }: { item: HistoryItem; accoun
             {item.kind === 'message' ? (item.direction === 'incoming' ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />) : item.kind === 'swap' ? <ArrowDownLeft size={16} /> : item.kind === 'bridge' ? <Milestone size={16} /> : item.kind === 'escrow' ? <ShieldCheck size={16} /> : <Layers3 size={16} />}
           </span>
           <div>
-            <h3 className="text-sm font-semibold text-zinc-100"><CardTitle item={item} t={t} /></h3>
+            <h3 className="text-sm font-semibold text-zinc-100"><CardTitle item={item} t={t} language={language} /></h3>
             <p className="mt-1 text-xs text-zinc-500">{formatTimestamp(item.timestamp, language)}</p>
           </div>
         </div>
@@ -561,6 +565,7 @@ function HistoryCard({ item, account, language, t }: { item: HistoryItem; accoun
       </div>
 
       <div className="mt-4">
+        {item.kind === 'earn' ? <div className="grid gap-2 text-sm sm:grid-cols-2"><Detail label="Vault" value={item.vaultName || item.vaultAddress} /><Detail label={language === 'tr' ? 'Tutar' : 'Amount'} value={`${item.amount} ${item.asset}`} /></div> : null}
         {item.kind === 'message' ? <MessageDetails item={item} account={account} t={t} /> : null}
         {item.kind === 'swap' ? (
           <div className="grid gap-2 text-sm sm:grid-cols-2">
@@ -620,7 +625,8 @@ function HistoryCard({ item, account, language, t }: { item: HistoryItem; accoun
   );
 }
 
-function CardTitle({ item, t }: { item: HistoryItem; t: HistoryCopy }) {
+function CardTitle({ item, t, language }: { item: HistoryItem; t: HistoryCopy; language: Language }) {
+  if (item.kind === 'earn') return <>Arcanum Earn · {language === 'tr' ? ({ deposit: 'Yatırma', withdraw: 'Çekme', claim: 'Ödül' }[item.action]) : ({ deposit: 'Deposit', withdraw: 'Withdraw', claim: 'Rewards' }[item.action])}</>;
   if (item.kind === 'message') return <>{item.channel === 'agent' ? t.agent : t.direct} · {item.direction === 'incoming' ? t.incoming : t.outgoing}</>;
   if (item.kind === 'swap') return <>{item.tokenIn} → {item.tokenOut}</>;
   if (item.kind === 'bridge') return <>USDC · {item.sourceChain} → {item.destinationChain}</>;

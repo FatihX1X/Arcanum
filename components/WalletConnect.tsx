@@ -70,6 +70,7 @@ import { Badge, EmptyState, Modal, cx } from './ui';
 import BridgeErrorBoundary from './BridgeErrorBoundary';
 
 const CircleOnramp = dynamic(() => import('./CircleOnramp'), { ssr: false });
+const ArcanumEarn = dynamic(() => import('./ArcanumEarn'), { ssr: false });
 
 const CircleSwap = dynamic(() => import('./CircleSwap'), {
   ssr: false,
@@ -703,6 +704,7 @@ export default function WalletConnect() {
 
         {view === 'swap' ? <CircleSwap language={language} /> : null}
         {view === 'onramp' ? <CircleOnramp language={language} /> : null}
+        {view === 'earn' ? <ArcanumEarn language={language} /> : null}
 
         {view === 'bridge' ? (
           <BridgeErrorBoundary language={language}>

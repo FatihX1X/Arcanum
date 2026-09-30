@@ -26,7 +26,7 @@ import ArcanumBrand from './ArcanumBrand';
 import { copy, type Language } from './arcanumCopy';
 import { Badge, Button, IconButton, cx } from './ui';
 
-export type AppView = 'dm' | 'groups' | 'bulk' | 'swap' | 'bridge' | 'onramp' | 'agents' | 'escrow' | 'history' | 'about' | 'faq';
+export type AppView = 'dm' | 'groups' | 'bulk' | 'swap' | 'bridge' | 'onramp' | 'earn' | 'agents' | 'escrow' | 'history' | 'about' | 'faq';
 
 type Copy = (typeof copy)[Language];
 
@@ -186,6 +186,7 @@ export function AppSidebar({
         { view: 'swap', label: t.nav.swap, icon: <ArrowLeftRight size={16} /> },
         { view: 'bridge', label: t.nav.bridge, icon: <Milestone size={16} /> },
         { view: 'onramp', label: 'Onramp', icon: <CreditCard size={16} /> },
+        { view: 'earn', label: 'Arcanum Earn', icon: <Wallet size={16} /> },
         { view: 'escrow', label: t.nav.escrow, icon: <ShieldCheck size={16} /> },
       ],
     },

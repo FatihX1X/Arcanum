@@ -161,6 +161,26 @@ Human keys are resolved from `ArcanumMessenger.encryptionKeys`; active agent key
 
 After deploying a replacement, update `lib/deployments.ts` and any hosting environment override together. Never commit `DEPLOYER_PRIVATE_KEY`.
 
+## Arcanum Earn
+
+The **Arcanum Earn** sidebar tab uses Circle App Kit on Arc mainnet for Morpho
+USDC/EURC vault discovery, wallet positions, deposit/withdraw previews and rewards.
+All active vaults are selectable; protocol warnings remain visible. Inactive
+vaults remain visible for position management and withdrawals.
+
+`CIRCLE_EARN_API_KEY` is optional and server-only. Use a Circle production key
+with the App Kits permission for higher limits; never use a `NEXT_PUBLIC_`
+variable. Without a key, requests use Circle's shared permissionless limit.
+The same-origin `/v1/earnKit/*` proxy allows only the required same-chain Earn
+endpoints, enforces Arc mainnet and applies an instance-local request limit.
+Use a hosting firewall limit as well when deploying at scale.
+
+Transactions are signed by the connected wallet. Arcanum does not hold funds or
+keys. History is local to the browser, wallet and chain; deleting browser data
+does not affect on-chain positions. Submitted hashes are recorded before receipt
+confirmation. API availability and quote success do not prove a live write works;
+validate writes in a test environment without spending mainnet funds.
+
 ## Build
 
 ```bash

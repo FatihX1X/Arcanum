@@ -2,12 +2,12 @@ import { formatUnits } from 'viem';
 
 import { arcSwapChainId, arcSwapTokens, type SwapTokenSymbol } from './circleSwap';
 
-export type HistoryTab = 'all' | 'incoming' | 'outgoing' | 'swap' | 'bridge' | 'escrow' | 'bulk';
+export type HistoryTab = 'all' | 'incoming' | 'outgoing' | 'swap' | 'bridge' | 'escrow' | 'bulk' | 'earn';
 export type HistoryStatus = 'confirmed' | 'pending' | 'failed' | 'estimated';
 
 type HistoryBase = {
   id: string;
-  kind: 'message' | 'swap' | 'bridge' | 'escrow' | 'bulk';
+  kind: 'message' | 'swap' | 'bridge' | 'escrow' | 'bulk' | 'earn';
   timestamp: number;
   status: HistoryStatus;
   txHash?: `0x${string}`;
@@ -84,11 +84,52 @@ export type BulkHistoryItem = HistoryBase & {
 };
 
 export type HistoryItem =
+  | EarnHistoryItem
   | MessageHistoryItem
   | SwapHistoryItem
   | BridgeHistoryItem
   | EscrowHistoryItem
   | BulkHistoryItem;
+
+export type EarnHistoryItem = HistoryBase & {
+  kind: 'earn';
+  action: 'deposit' | 'withdraw' | 'claim';
+  account: `0x${string}`;
+  chainId: number;
+  vaultAddress: string;
+  vaultName: string;
+  amount: string;
+  asset: string;
+};
+
+export function readLocalEarnHistory(account: string): EarnHistoryItem[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const records: unknown = JSON.parse(window.localStorage.getItem(`arcanum.earn.history.v1:5042:${account.toLowerCase()}`) ?? '[]');
+    if (!Array.isArray(records)) return [];
+    return records.filter((r): r is EarnHistoryItem => r?.kind === 'earn' && r.chainId === 5042 && r.account?.toLowerCase() === account.toLowerCase() && typeof r.id === 'string' && typeof r.vaultAddress === 'string' && typeof r.timestamp === 'number' && ['deposit', 'withdraw', 'claim'].includes(r.action) && ['pending', 'confirmed', 'failed'].includes(r.status));
+  } catch { return []; }
+}
+
+export function saveLocalEarnHistory(record: EarnHistoryItem) {
+  if (typeof window === 'undefined') return;
+  try {
+    const records = readLocalEarnHistory(record.account).filter(r => r.id !== record.id);
+    window.localStorage.setItem(`arcanum.earn.history.v1:5042:${record.account.toLowerCase()}`, JSON.stringify([record, ...records].slice(0, 200)));
+  } catch { /* The receipt remains authoritative when local storage is unavailable. */ }
+}
+
+export async function reconcileLocalEarnHistory(account: string, getReceipt: (hash: `0x${string}`) => Promise<{ status: 'success' | 'reverted' }>) {
+  const records = readLocalEarnHistory(account);
+  await Promise.all(records.filter(r => r.status === 'pending' && r.txHash).slice(0, 20).map(async record => {
+    try {
+      const receipt = await getReceipt(record.txHash!);
+      record.status = receipt.status === 'success' ? 'confirmed' : 'failed';
+      saveLocalEarnHistory(record);
+    } catch { /* Missing receipts stay pending and are never resubmitted. */ }
+  }));
+  return readLocalEarnHistory(account);
+}
 
 export type LocalSwapHistoryRecord = Omit<SwapHistoryItem, 'id' | 'kind' | 'source'> & {
   chainId: number;
@@ -219,6 +260,7 @@ export function saveLocalBridgeHistory(record: LocalBridgeHistoryRecord) {
 }
 
 export function historyIdentity(item: HistoryItem) {
+  if (item.kind === 'earn') return `earn:${item.chainId}:${item.txHash ?? item.id}:${item.action}`;
   if (item.kind === 'bridge') return `bridge:${item.bridgeId}`;
   if (item.txHash) {
     const suffix = item.kind === 'message'
@@ -264,6 +306,7 @@ export function filterHistory(items: HistoryItem[], tab: HistoryTab, query = '')
 
 function historySearchText(item: HistoryItem) {
   const common = `${item.id} ${item.txHash ?? ''} ${item.status}`;
+  if (item.kind === 'earn') return `${common} ${item.action} ${item.vaultName} ${item.vaultAddress} ${item.asset} ${item.amount}`.toLowerCase();
   if (item.kind === 'message') {
     return `${common} ${item.channel} ${item.direction} ${item.sender} ${item.recipient} ${item.isPrivate ? '' : item.payload}`.toLowerCase();
   }
