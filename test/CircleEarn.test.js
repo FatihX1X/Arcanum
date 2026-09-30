@@ -18,6 +18,12 @@ function load(relative = 'lib/circleEarn.ts', dependencies = {}) {
 
 describe('Circle Earn safeguards', () => {
   const earn = load();
+  it('allows low-liquidity deposit previews without opening inactive or unknown vaults', () => {
+    for (const status of ['active', 'low_liquidity']) expect(earn.earnDepositAllowed(status)).to.equal(true);
+    for (const status of ['inactive', 'paused', 'deprecated', '', undefined]) expect(earn.earnDepositAllowed(status)).to.equal(false);
+    expect(earn.earnMaximum('deposit', 7182580n, 0n, 100000n, 'USDC')).to.equal(7082580n);
+    expect(earn.earnMaximum('withdraw', 7182580n, 0n, 100000n, 'USDC')).to.equal(0n);
+  });
   it('parses six-decimal values exactly and rejects malformed SDK inputs', () => {
     expect(earn.parseEarnAmount('9007199254740993.123456')).to.equal(9007199254740993123456n);
     for (const input of ['0', '-1', '.5', '00.5', '1e3', '1.1234567', 'NaN', '1.']) expect(earn.parseEarnAmount(input)).to.equal(null);

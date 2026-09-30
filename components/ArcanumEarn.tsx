@@ -9,7 +9,7 @@ import { createPublicClient, formatUnits, http, parseAbi, type EIP1193Provider }
 import { arcNetwork, transactionUrl } from '../lib/chain';
 import { rpcProxyPath } from '../lib/rpcProxy';
 import { arcSwapTokens, estimateGasReserveUsdc, type SwapEip1193Provider } from '../lib/circleSwap';
-import { assertEarnQuote, createEarnScopedProvider, earnChain, earnError, earnGasReserve, earnMaximum, earnQuoteMatches, earnUnits, formatEarnAmount, parseEarnAmount, type EarnAction } from '../lib/circleEarn';
+import { assertEarnQuote, createEarnScopedProvider, earnChain, earnDepositAllowed, earnError, earnGasReserve, earnMaximum, earnQuoteMatches, earnUnits, formatEarnAmount, parseEarnAmount, type EarnAction } from '../lib/circleEarn';
 import { readLocalEarnHistory, reconcileLocalEarnHistory, saveLocalEarnHistory, type EarnHistoryItem } from '../lib/history';
 import type { Language } from './arcanumCopy';
 import { Badge, Button, Field, IconButton, cx } from './ui';
@@ -29,6 +29,7 @@ const copy = {
     vaults: 'Vaults', positions: 'My positions', all: 'All assets', apy: 'APY', tvl: 'Total deposits', liquidity: 'Liquidity', name: 'Name',
     loading: 'Loading vaults…', empty: 'No vaults found.', noPositions: 'No positions found.', choose: 'Select a vault to view details.',
     manager: 'Curator', fees: 'Vault fees', collateral: 'Collateral', unavailable: 'Unavailable', active: 'Active', low: 'Low liquidity',
+    lowDeposit: 'Low withdrawal liquidity. Deposits can be previewed, but withdrawals may be limited or delayed.', depositBlocked: 'This vault is unavailable for new deposits.',
     deposit: 'Deposit', withdraw: 'Withdraw', claim: 'Claim rewards', amount: 'Amount', max: 'Max', balance: 'Available', preview: 'Preview', confirm: 'Confirm in wallet',
     shares: 'Vault shares', position: 'Position value', yield: 'Yield earned', pendingPnl: 'Reconciling', unavailablePnl: 'Yield data unavailable', rewards: 'Rewards',
     risk: 'Returns vary and are not guaranteed. Vaults carry contract, collateral, curator and liquidity risk; withdrawals depend on available liquidity.',
@@ -43,6 +44,7 @@ const copy = {
     vaults: 'Vaultlar', positions: 'Pozisyonlarım', all: 'Tüm varlıklar', apy: 'APY', tvl: 'Toplam yatırılan', liquidity: 'Likidite', name: 'İsim',
     loading: 'Vaultlar yükleniyor…', empty: 'Vault bulunamadı.', noPositions: 'Pozisyon bulunamadı.', choose: 'Detayları görmek için bir vault seçin.',
     manager: 'Yönetici', fees: 'Vault ücretleri', collateral: 'Teminatlar', unavailable: 'Kullanılamıyor', active: 'Aktif', low: 'Düşük likidite',
+    lowDeposit: 'Çekim likiditesi düşük. Yatırma önizlenebilir; ancak çekimler sınırlanabilir veya gecikebilir.', depositBlocked: 'Bu vault yeni yatırımlara kapalı.',
     deposit: 'Yatır', withdraw: 'Çek', claim: 'Ödülleri al', amount: 'Tutar', max: 'Maks.', balance: 'Kullanılabilir', preview: 'Önizle', confirm: 'Cüzdanda onayla',
     shares: 'Vault payları', position: 'Pozisyon değeri', yield: 'Kazanılan getiri', pendingPnl: 'Hesaplanıyor', unavailablePnl: 'Getiri verisi mevcut değil', rewards: 'Ödüller',
     risk: 'Getiri değişkendir ve garanti edilmez. Vaultlar kontrat, teminat, yönetici ve likidite riski taşır; çekimler mevcut likiditeye bağlıdır.',
@@ -118,7 +120,7 @@ function EarnPanel({ language, account, connector, connected, chainId }: {
   const reserve = earnGasReserve(quote?.data.gasFees, estimateGasReserveUsdc(gasPrice, 1_000_000n));
   const maximum = earnMaximum(action, action === 'withdraw' ? earnUnits(position?.currentBalance) : tokenBalance ?? 0n, earnUnits(vault?.liquidity), reserve, vault?.asset ?? 'USDC');
   const amountUnits = parseEarnAmount(amount);
-  const canPreview = ready && !!vault && (action === 'claim' || (!!amountUnits && amountUnits <= maximum)) && (action !== 'deposit' || vault.status === 'active');
+  const canPreview = ready && !!vault && (action === 'claim' || (!!amountUnits && amountUnits <= maximum)) && (action !== 'deposit' || earnDepositAllowed(vault.status));
   const fresh = earnQuoteMatches(quote, key, tick);
   const locked = phase !== 'idle';
 
@@ -217,7 +219,7 @@ function EarnPanel({ language, account, connector, connected, chainId }: {
       const from = { adapter: walletAdapter, chain: earnChain };
       const latest = await kit.earn.getVaults({ vaults: [{ chain: earnChain, vaultAddress: vault.vaultAddress }], config: config() });
       const latestVault = latest.vaults[0];
-      if (!latestVault || !supportedVault(latestVault) || latestVault.vaultAddress.toLowerCase() !== vault.vaultAddress.toLowerCase() || latestVault.assetAddress.toLowerCase() !== vault.assetAddress.toLowerCase() || (action === 'deposit' && latestVault.status !== 'active')) throw new Error('Vault unavailable');
+      if (!latestVault || !supportedVault(latestVault) || latestVault.vaultAddress.toLowerCase() !== vault.vaultAddress.toLowerCase() || latestVault.assetAddress.toLowerCase() !== vault.assetAddress.toLowerCase() || (action === 'deposit' && !earnDepositAllowed(latestVault.status))) throw new Error('Vault unavailable');
       const onchainAsset = await publicClient.readContract({ address: vault.vaultAddress as `0x${string}`, abi: vaultAssetAbi, functionName: 'asset' });
       if (onchainAsset.toLowerCase() !== vault.assetAddress.toLowerCase()) throw new Error('Vault asset mismatch');
       const newBalance = await refetchBalance();
@@ -250,7 +252,7 @@ function EarnPanel({ language, account, connector, connected, chainId }: {
 
   const list = vaults.filter(v => (filter === 'all' || v.asset === filter) && (tab === 'vaults' || Number(positions[v.vaultAddress]?.shares ?? '0') > 0)).slice().sort((a, b) => sort === 'name' ? a.name.localeCompare(b.name) : sort === 'apy' ? b.currentApy - a.currentApy : earnUnits(a.totalDeposits) < earnUnits(b.totalDeposits) ? 1 : -1);
 
-  function select(v: Vault) { setSelected(v.vaultAddress); setAmount(''); setQuote(null); setError(''); setNotice(''); setTxHash(undefined); setAction(v.status === 'active' ? 'deposit' : 'withdraw'); }
+  function select(v: Vault) { setSelected(v.vaultAddress); setAmount(''); setQuote(null); setError(''); setNotice(''); setTxHash(undefined); setAction(earnDepositAllowed(v.status) ? 'deposit' : 'withdraw'); }
   function labelStatus(v: Vault) { return v.status === 'active' ? t.active : v.status === 'low_liquidity' ? t.low : t.unavailable; }
 
   return (
@@ -291,6 +293,8 @@ function EarnPanel({ language, account, connector, connected, chainId }: {
                 <div><p className="field-label">{t.collateral}</p>{vault.collateral.length ? vault.collateral.map((c, i) => <p key={i} className="mt-2 text-xs text-zinc-400">{c.asset} · LLTV {percent(c.lltv)}{c.allocationPct != null ? ` · ${percent(c.allocationPct)}` : ''}</p>) : <p className="mt-2 text-xs text-zinc-500">{t.noCollateral}</p>}</div>
                 {position ? <div className="grid grid-cols-2 gap-3 border-y border-zinc-800 py-4"><Metric label={t.position} value={`${position.currentBalance} ${vault.asset}`} /><Metric label={t.shares} value={position.shares} /><Metric label={t.yield} value={position.pnl.status === 'available' ? `${position.pnl.totalYieldEarned} ${vault.asset}` : position.pnl.status === 'pending' ? t.pendingPnl : t.unavailablePnl} /><Metric label={t.rewards} value={position.rewardsUnavailableReason ? t.unavailable : position.accruedRewards.map(r => `${r.amount} ${r.symbol}`).join(', ') || '—'} /></div> : null}
                 <div className="flex flex-wrap gap-1">{(['deposit', 'withdraw', 'claim'] as const).map(a => <Button key={a} size="sm" variant={action === a ? 'primary' : 'subtle'} disabled={locked} onClick={() => { setAction(a); setQuote(null); setAmount(''); setError(''); }}>{a === 'deposit' ? <ArrowDownLeft size={14} /> : a === 'withdraw' ? <ArrowUpRight size={14} /> : <Wallet size={14} />}{t[a]}</Button>)}</div>
+                {action === 'deposit' && vault.status === 'low_liquidity' ? <p className="text-xs text-amber-200" role="status">{t.lowDeposit}</p> : null}
+                {action === 'deposit' && !earnDepositAllowed(vault.status) ? <p className="text-xs text-amber-200" role="status">{t.depositBlocked}</p> : null}
                 {action !== 'claim' ? <><div className="flex justify-between gap-2 text-xs text-zinc-500"><span>{t.balance}: {formatEarnAmount(maximum)} {vault.asset}</span><button type="button" className="text-accent" disabled={locked || !ready} onClick={() => { setAmount(formatEarnAmount(maximum)); setQuote(null); }}>{t.max}</button></div><Field label={`${t.amount} (${vault.asset})`} inputMode="decimal" value={amount} disabled={locked} onChange={e => { if (/^\d*(\.\d{0,6})?$/.test(e.target.value)) { setAmount(e.target.value); setQuote(null); } }} error={amountUnits && amountUnits > maximum ? t.insufficient : undefined} /></> : null}
                 {quote && quote.key === key ? <div className="border-y border-zinc-800 py-4 space-y-2 text-xs text-zinc-400">
                   {'expectedShares' in quote.data ? <Metric label={t.shares} value={quote.data.expectedShares.amount} /> : null}

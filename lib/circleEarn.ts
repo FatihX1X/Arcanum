@@ -4,6 +4,9 @@ export const earnChain = 'Arc' as const;
 export const earnChainId = 5042;
 export const earnQuoteTtl = 30_000;
 export type EarnAction = 'deposit' | 'withdraw' | 'claim';
+export function earnDepositAllowed(status: string | undefined) {
+  return status === 'active' || status === 'low_liquidity';
+}
 type Provider = { request(args: { method: string; params?: unknown }): Promise<unknown> };
 
 export async function createEarnScopedProvider(provider: Provider, account: string, isCurrent: () => boolean, onSubmitted?: (hash: `0x${string}`) => void): Promise<Provider> {
