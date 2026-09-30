@@ -1,7 +1,7 @@
 'use client';
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, ExternalLink, FileUp, Loader2, Plus, Send, Trash2, WalletCards, X } from 'lucide-react';
+import { CheckCircle2, ExternalLink, FileUp, Loader2, Plus, Send, Trash2, WalletCards, X } from './PixelIcons';
 import { formatEther, isAddress, parseEther } from 'viem';
 import { useAccount, useBalance, useChainId, usePublicClient, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 import { arcNetwork, transactionUrl } from '../lib/chain';

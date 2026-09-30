@@ -21,7 +21,7 @@ import {
   Undo2,
   WalletCards,
   X,
-} from 'lucide-react';
+} from './PixelIcons';
 import { encodePacked, formatEther, isAddress, isHex, keccak256, parseEther, toBytes } from 'viem';
 import { useAccount, useChainId, usePublicClient, useReadContract, useWatchContractEvent, useWriteContract } from 'wagmi';
 import { arcanumAgentsAbi, arcanumAgentsAddress, isArcanumAgentsConfigured } from '../lib/agentsContract';
@@ -584,7 +584,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 function ModalActions({ t, pending, onClose }: { t: typeof text.en | typeof text.tr; pending: boolean; onClose: () => void }) { return <div className="mt-2 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><button type="button" onClick={onClose} className="btn-ghost h-10 px-4">{t.cancel}</button><button type="submit" disabled={pending} className="btn-primary h-10 px-4">{pending ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}{t.submit}</button></div>; }
 function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="grid gap-2"><span className="text-xs font-medium text-zinc-500">{label}</span>{children}</label>; }
 function Empty({ text: value }: { text: string }) { return <div className="rounded-lg border border-dashed border-zinc-800 bg-zinc-950 p-4 text-sm leading-6 text-zinc-500">{value}</div>; }
-function Badge({ children }: { children: ReactNode }) { return <span className="inline-flex items-center gap-1 rounded-full border border-zinc-700 bg-zinc-900 px-2 py-1 text-[11px] font-medium text-zinc-300">{children}</span>; }
-function StatusBadge({ status }: { status: number }) { const styles = status === 0 ? 'border-amber-300/25 bg-amber-300/10 text-amber-200' : status === 1 ? 'border-emerald-400/25 bg-emerald-400/10 text-emerald-200' : status === 2 ? 'border-sky-300/25 bg-sky-300/10 text-sky-200' : 'border-red-400/25 bg-red-400/10 text-red-200'; return <span className={`status-badge rounded-full border px-2.5 py-1 text-xs font-medium ${styles}`}>{statusLabels[status]}</span>; }
+function Badge({ children }: { children: ReactNode }) { return <span className="inline-flex items-center gap-1 rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-[11px] font-medium text-zinc-300">{children}</span>; }
+function StatusBadge({ status }: { status: number }) { const styles = status === 0 ? 'border-amber-300/25 bg-amber-300/10 text-amber-200' : status === 1 ? 'border-emerald-400/25 bg-emerald-400/10 text-emerald-200' : status === 2 ? 'border-sky-300/25 bg-sky-300/10 text-sky-200' : 'border-red-400/25 bg-red-400/10 text-red-200'; return <span className={`status-badge rounded-md border px-2.5 py-1 text-xs font-medium ${styles}`}>{statusLabels[status]}</span>; }
 function Metric({ label, value }: { label: string; value: string }) { return <div className="rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2"><p className="text-[11px] text-zinc-600">{label}</p><p className="mt-1 truncate font-mono text-xs text-zinc-200">{value}</p></div>; }
 function Notice({ tone, icon, children }: { tone: 'warning' | 'danger' | 'success'; icon: ReactNode; children: ReactNode }) { const style = tone === 'warning' ? 'border-amber-300/25 bg-amber-300/10 text-amber-200' : tone === 'danger' ? 'border-red-400/25 bg-red-400/10 text-red-200' : 'border-emerald-400/25 bg-emerald-400/10 text-emerald-200'; return <div className={`mt-4 flex items-start gap-2 rounded-md border px-3 py-2 text-sm ${style}`}>{icon}<div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 break-words">{children}</div></div>; }

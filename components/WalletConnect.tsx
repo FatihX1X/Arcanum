@@ -21,7 +21,7 @@ import {
   Shield,
   Upload,
   X,
-} from 'lucide-react';
+} from './PixelIcons';
 import {
   useAccount,
   useChainId,
@@ -64,7 +64,6 @@ import {
   AppHeader as ShellHeader,
   AppSidebar as ShellSidebar,
   type AppView,
-  type ThemeMode,
 } from './AppChrome';
 import { copy, type Language } from './arcanumCopy';
 import { Badge, EmptyState, Modal, cx } from './ui';
@@ -191,7 +190,6 @@ export default function WalletConnect() {
   const { writeContractAsync, isPending: isWritePending, error: writeError } = useWriteContract();
 
   const [language, setLanguageState] = useState<Language>('en');
-  const [theme, setThemeState] = useState<ThemeMode>('dark');
   const [view, setView] = useState<AppView>('dm');
   const [menuOpen, setMenuOpen] = useState(false);
   const [newRecipient, setNewRecipient] = useState('');
@@ -344,9 +342,6 @@ export default function WalletConnect() {
     }
   }, []);
 
-  useEffect(() => {
-    setThemeState(document.documentElement.dataset.theme === 'light' ? 'light' : 'dark');
-  }, []);
 
   useEffect(() => {
     refreshLocalKeyStatus();
@@ -395,12 +390,6 @@ export default function WalletConnect() {
     localStorage.setItem('arcanum.language', next);
   }
 
-  function setTheme(next: ThemeMode) {
-    document.documentElement.dataset.theme = next;
-    document.documentElement.style.colorScheme = next;
-    localStorage.setItem('arcanum.theme', next);
-    setThemeState(next);
-  }
 
   function chooseView(next: AppView) {
     setView(next);
@@ -636,10 +625,8 @@ export default function WalletConnect() {
             hasOwnKey={hasOwnKey}
             hasLocalKey={localKeyStored}
             localUnlocked={localKeyUnlocked}
-            theme={theme}
             onView={chooseView}
             onKeyCenter={() => openKeyModal(hasOwnKey ? (localKeyStored ? 'unlock' : 'import') : 'register')}
-            onTheme={setTheme}
           />
         </div>
       ) : null}
@@ -661,10 +648,8 @@ export default function WalletConnect() {
             hasOwnKey={hasOwnKey}
             hasLocalKey={localKeyStored}
             localUnlocked={localKeyUnlocked}
-            theme={theme}
             onView={chooseView}
             onKeyCenter={() => openKeyModal(hasOwnKey ? (localKeyStored ? 'unlock' : 'import') : 'register')}
-            onTheme={setTheme}
           />
         </div>
 
@@ -987,7 +972,7 @@ function ConversationButton({
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <Pill tone={conversation.latest.isPrivate ? 'success' : 'info'} label={conversation.latest.isPrivate ? t.common.private : t.common.public} />
-        <span className="rounded-full border border-zinc-800 px-2 py-1 text-[11px] text-zinc-500">#{conversation.latest.id.toString()}</span>
+        <span className="rounded-md border border-zinc-800 px-2 py-1 text-[11px] text-zinc-500">#{conversation.latest.id.toString()}</span>
         {pending ? <Pill tone="warning" icon={<Clock3 size={12} />} label={t.dm.pendingHint} /> : null}
       </div>
     </button>
@@ -1223,8 +1208,8 @@ function TransactionTimeline({
           {stepOrder.map((item, index) => {
             const complete = step === 'success' || (activeIndex >= 0 && index <= activeIndex);
             return (
-              <span key={item} className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs ${complete ? 'border-emerald-400/25 bg-emerald-400/10 text-emerald-200' : 'border-zinc-800 text-zinc-500'}`}>
-                <span className={`h-1.5 w-1.5 rounded-full ${complete ? 'bg-emerald-300' : 'bg-zinc-700'}`} />
+              <span key={item} className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs ${complete ? 'border-emerald-400/25 bg-emerald-400/10 text-emerald-200' : 'border-zinc-800 text-zinc-500'}`}>
+                <span className={`h-1.5 w-1.5 rounded-md ${complete ? 'bg-emerald-300' : 'bg-zinc-700'}`} />
                 {t.status.steps[index]}
               </span>
             );

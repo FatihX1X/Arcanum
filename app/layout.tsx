@@ -9,24 +9,9 @@ export const metadata: Metadata = {
   },
   description: 'Private communication and settlement on Arc Network',
   icons: {
-    icon: '/arcanum-mark.svg',
+    icon: '/arcanum-coin.png',
   },
 };
-
-const themeInitScript = `
-  (() => {
-    try {
-      const stored = localStorage.getItem('arcanum.theme');
-      const theme = stored === 'light' || stored === 'dark'
-        ? stored
-        : (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
-      document.documentElement.dataset.theme = theme;
-      document.documentElement.style.colorScheme = theme;
-    } catch {
-      document.documentElement.dataset.theme = 'dark';
-    }
-  })();
-`;
 
 export default function RootLayout({
   children,
@@ -34,10 +19,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="tr" suppressHydrationWarning>
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
-      </head>
+    <html lang="tr" data-theme="pixel" style={{ colorScheme: 'dark' }}>
       <body className="antialiased">
         <Providers>{children}</Providers>
       </body>

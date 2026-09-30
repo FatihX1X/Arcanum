@@ -9,7 +9,7 @@ import {
   RefreshCw,
   ShieldCheck,
   WalletCards,
-} from 'lucide-react';
+} from './PixelIcons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { EIP1193Provider } from 'viem';
 import { createPublicClient, http, parseAbi, zeroAddress } from 'viem';
@@ -584,7 +584,7 @@ export default function CircleSwap({ language }: { language: Language }) {
             type="button"
             onClick={flipTokens}
             disabled={busy}
-            className="btn-ghost h-10 w-10 rounded-full"
+            className="btn-ghost h-10 w-10 rounded-md"
             aria-label={`${t.from} / ${t.to}`}
           >
             <ArrowDownUp size={17} />

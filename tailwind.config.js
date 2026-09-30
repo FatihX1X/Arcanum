@@ -7,6 +7,8 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        white: "var(--text-primary)",
+        black: "var(--canvas)",
         zinc: {
           50: "var(--text-primary)",
           100: "var(--text-primary)",

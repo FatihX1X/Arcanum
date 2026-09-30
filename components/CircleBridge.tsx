@@ -7,7 +7,7 @@ import {
   Loader2,
   Route,
   WalletCards,
-} from 'lucide-react';
+} from './PixelIcons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createViemAdapterFromProvider } from '@circle-fin/adapter-viem-v2';
 import {

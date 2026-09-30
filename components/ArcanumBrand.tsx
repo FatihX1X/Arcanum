@@ -12,13 +12,15 @@ export default function ArcanumBrand({
     <span className={cx('arcanum-brand', compact && 'arcanum-brand-compact', className)} aria-label="Arcanum">
       <span className="arcanum-logo-frame" aria-hidden="true">
         <Image
-          src="/arcanum-logo.png"
+          src="/arcanum-coin.png"
           alt=""
-          width={320}
-          height={88}
+          width={32}
+          height={32}
+          unoptimized
           priority
           className="arcanum-logo-image"
         />
+        <span className="arcanum-wordmark">Arcanum</span>
       </span>
     </span>
   );

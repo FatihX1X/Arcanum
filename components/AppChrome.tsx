@@ -16,20 +16,17 @@ import {
   Milestone,
   Menu,
   MessageCircle,
-  Moon,
   ShieldCheck,
-  Sun,
   UsersRound,
   Wallet,
   Wifi,
   X,
-} from 'lucide-react';
+} from './PixelIcons';
 import ArcanumBrand from './ArcanumBrand';
 import { copy, type Language } from './arcanumCopy';
 import { Badge, Button, IconButton, cx } from './ui';
 
 export type AppView = 'dm' | 'groups' | 'bulk' | 'swap' | 'bridge' | 'onramp' | 'agents' | 'escrow' | 'history' | 'about' | 'faq';
-export type ThemeMode = 'light' | 'dark';
 
 type Copy = (typeof copy)[Language];
 
@@ -154,10 +151,8 @@ export function AppSidebar({
   hasOwnKey,
   hasLocalKey,
   localUnlocked,
-  theme,
   onView,
   onKeyCenter,
-  onTheme,
 }: {
   t: Copy;
   language: Language;
@@ -169,10 +164,8 @@ export function AppSidebar({
   hasOwnKey: boolean;
   hasLocalKey: boolean;
   localUnlocked: boolean;
-  theme: ThemeMode;
   onView: (view: AppView) => void;
   onKeyCenter: () => void;
-  onTheme: (theme: ThemeMode) => void;
 }) {
   const groups: Array<{
     label: string;
@@ -267,30 +260,6 @@ export function AppSidebar({
           <FileKey2 size={14} />
           {t.sidebar.openKeyCenter}
         </Button>
-      </div>
-
-      <div className="theme-control mt-auto">
-        <p className="sidebar-group-label">{t.sidebar.theme}</p>
-        <div className="theme-switch" role="group" aria-label={t.sidebar.theme}>
-          <button
-            type="button"
-            onClick={() => onTheme('light')}
-            className={cx('theme-option', theme === 'light' && 'theme-option-active')}
-            aria-pressed={theme === 'light'}
-          >
-            <Sun size={15} />
-            {t.sidebar.light}
-          </button>
-          <button
-            type="button"
-            onClick={() => onTheme('dark')}
-            className={cx('theme-option', theme === 'dark' && 'theme-option-active')}
-            aria-pressed={theme === 'dark'}
-          >
-            <Moon size={15} />
-            {t.sidebar.dark}
-          </button>
-        </div>
       </div>
     </aside>
   );

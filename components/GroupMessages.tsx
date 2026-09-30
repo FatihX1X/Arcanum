@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, ExternalLink, KeyRound, Loader2, Plus, RefreshCw, Send, Settings2, ShieldCheck, UsersRound, X } from 'lucide-react';
+import { CheckCircle2, ExternalLink, KeyRound, Loader2, Plus, RefreshCw, Send, Settings2, ShieldCheck, UsersRound, X } from './PixelIcons';
 import { isAddress } from 'viem';
 import { useAccount, useChainId, usePublicClient, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 import { arcNetwork, transactionUrl } from '../lib/chain';
@@ -366,7 +366,7 @@ export default function GroupMessages({ language }: { language: Language }) {
             <h2 className="panel-title">{copy.title}</h2>
           </div>
           <div className="flex items-center gap-2">
-            <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2.5 py-1 text-xs text-emerald-200">{groups.length} {copy.groupCount}</span>
+            <span className="rounded-md border border-emerald-400/25 bg-emerald-400/10 px-2.5 py-1 text-xs text-emerald-200">{groups.length} {copy.groupCount}</span>
             <button type="button" onClick={() => void refresh()} disabled={loading || Boolean(unavailable)} className="btn-ghost h-10 px-3">
               <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> {copy.refresh}
             </button>

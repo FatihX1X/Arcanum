@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { CreditCard, KeyRound, Lock, Plus, RefreshCw, Search, Send, Shield, UserPlus } from 'lucide-react';
+import { CreditCard, KeyRound, Lock, Plus, RefreshCw, Search, Send, Shield, UserPlus } from './PixelIcons';
 import { formatEther, isAddress, parseEther, zeroAddress } from 'viem';
 import { useAccount, useChainId, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 import { arcNetwork, transactionUrl } from '../lib/chain';
@@ -533,7 +533,7 @@ export default function AgentMessages({ language }: { language: Language }) {
                   <p className="truncate text-sm font-semibold text-zinc-100">{ownProfile?.name || short(connectedAddress)}</p>
                   <p className="mt-1 break-words text-xs text-zinc-500">{ownProfile?.description || copy.eyebrow}</p>
                 </div>
-                <span className={`rounded-full border px-2.5 py-1 text-xs ${ownActive ? 'border-emerald-400/25 bg-emerald-400/10 text-emerald-200' : 'border-amber-300/25 bg-amber-300/10 text-amber-200'}`}>
+                <span className={`rounded-md border px-2.5 py-1 text-xs ${ownActive ? 'border-emerald-400/25 bg-emerald-400/10 text-emerald-200' : 'border-amber-300/25 bg-amber-300/10 text-amber-200'}`}>
                   {ownActive ? copy.active : copy.inactive}
                 </span>
               </div>
@@ -695,7 +695,7 @@ function AgentBubble({
     <article className={`message-bubble max-w-[88%] rounded-lg border px-3 py-2 ${outgoing ? 'message-bubble-outgoing ml-auto border-emerald-400/25 bg-emerald-400/10' : 'mr-auto border-zinc-800 bg-zinc-900'}`}>
       <AgentMessageText message={message} viewer={viewer} copy={copy} />
       {message.paymentAmount > BigInt(0) ? (
-        <p className="mt-2 inline-flex items-center gap-1 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2.5 py-1 text-xs font-medium text-emerald-200">
+        <p className="mt-2 inline-flex items-center gap-1 rounded-md border border-emerald-400/25 bg-emerald-400/10 px-2.5 py-1 text-xs font-medium text-emerald-200">
           <CreditCard size={13} />
           {formatEther(message.paymentAmount)} {copy.sentPayment}
         </p>
@@ -777,7 +777,7 @@ function Pill({ tone, label }: { tone: 'success' | 'warning' | 'info'; label: st
   }[tone];
 
   return (
-    <span className={`inline-flex min-w-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${toneClass}`}>
+    <span className={`inline-flex min-w-0 items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium ${toneClass}`}>
       <span className="truncate">{label}</span>
     </span>
   );

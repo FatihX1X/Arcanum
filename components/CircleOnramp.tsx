@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { CreditCard, ExternalLink, RefreshCw, Wallet } from 'lucide-react';
+import { CreditCard, ExternalLink, RefreshCw, Wallet } from './PixelIcons';
 import { useAccount, useSignMessage } from 'wagmi';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Address } from 'viem';

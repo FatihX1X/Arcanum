@@ -13,7 +13,7 @@ import {
   MessageCircle,
   ShieldCheck,
   UsersRound,
-} from 'lucide-react';
+} from './PixelIcons';
 import type { Language } from './arcanumCopy';
 import ArcanumBrand from './ArcanumBrand';
 
@@ -126,7 +126,7 @@ function FlowCard({ icon, title, body, steps }: { icon: ReactNode; title: string
       <div className="mt-6 flex flex-wrap items-center gap-2">
         {steps.map((step, index) => (
           <div key={step} className="contents">
-            <span className="rounded-full border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-xs text-zinc-300">{step}</span>
+            <span className="rounded-md border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-xs text-zinc-300">{step}</span>
             {index < steps.length - 1 ? <ArrowRight size={13} className="text-zinc-600" /> : null}
           </div>
         ))}

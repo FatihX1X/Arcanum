@@ -15,7 +15,7 @@ import {
   Search,
   Send,
   ShieldCheck,
-} from 'lucide-react';
+} from './PixelIcons';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { formatEther, type PublicClient } from 'viem';
 import { useAccount, usePublicClient } from 'wagmi';
@@ -506,7 +506,7 @@ export default function ArcanumHistory({ language }: { language: Language }) {
           >
             {item.icon}
             <span>{t.tabs[item.id]}</span>
-            <span className="rounded-full bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">{counts[item.id]}</span>
+            <span className="rounded-md bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">{counts[item.id]}</span>
           </button>
         ))}
       </div>
@@ -555,7 +555,7 @@ function HistoryCard({ item, account, language, t }: { item: HistoryItem; accoun
             <p className="mt-1 text-xs text-zinc-500">{formatTimestamp(item.timestamp, language)}</p>
           </div>
         </div>
-        <span className={`rounded-full border px-2 py-1 text-[11px] ${item.status === 'confirmed' ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : item.status === 'failed' ? 'border-red-400/20 bg-red-400/10 text-red-300' : 'border-amber-300/20 bg-amber-300/10 text-amber-200'}`}>
+        <span className={`rounded-md border px-2 py-1 text-[11px] ${item.status === 'confirmed' ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : item.status === 'failed' ? 'border-red-400/20 bg-red-400/10 text-red-300' : 'border-amber-300/20 bg-amber-300/10 text-amber-200'}`}>
           {t.statuses[item.status]}
         </span>
       </div>
@@ -699,10 +699,10 @@ function MessageDetails({ item, account, t }: { item: MessageHistoryItem; accoun
   return (
     <div>
       <div className="flex flex-wrap gap-2">
-        <span className="rounded-full border border-zinc-800 px-2 py-1 text-[11px] text-zinc-400">
+        <span className="rounded-md border border-zinc-800 px-2 py-1 text-[11px] text-zinc-400">
           {item.isPrivate ? <Lock size={11} className="mr-1 inline" /> : null}{item.isPrivate ? t.private : t.public}
         </span>
-        {item.paymentAmount && item.paymentAmount !== '0' ? <span className="rounded-full border border-emerald-400/20 px-2 py-1 text-[11px] text-emerald-300">{t.payment}: {item.paymentAmount} USDC</span> : null}
+        {item.paymentAmount && item.paymentAmount !== '0' ? <span className="rounded-md border border-emerald-400/20 px-2 py-1 text-[11px] text-emerald-300">{t.payment}: {item.paymentAmount} USDC</span> : null}
       </div>
       <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-zinc-200">{content || (failure === 'locked' ? t.locked : failure === 'decrypt' ? t.decryptFailed : '')}</p>
       <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">

@@ -9,7 +9,7 @@ import {
   useEffect,
   useRef,
 } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2 } from './PixelIcons';
 
 export type UiTone = 'neutral' | 'accent' | 'success' | 'warning' | 'danger' | 'info';
 export type UiSize = 'sm' | 'md' | 'lg';
@@ -145,6 +145,14 @@ const toneClass: Record<UiTone, string> = {
   info: 'badge-info',
 };
 
+const statusToneClass: Record<Exclude<UiTone, 'accent'>, string> = {
+  neutral: 'status-neutral',
+  success: 'status-success',
+  warning: 'status-warning',
+  danger: 'status-danger',
+  info: 'status-info',
+};
+
 export function Badge({
   tone = 'neutral',
   icon,
@@ -182,7 +190,7 @@ export function StatusBanner({
   role?: HTMLAttributes<HTMLDivElement>['role'];
 }) {
   return (
-    <div className={cx('status-banner', `status-${tone}`, className)} role={role ?? (tone === 'danger' ? 'alert' : 'status')}>
+    <div className={cx('status-banner', statusToneClass[tone], className)} role={role ?? (tone === 'danger' ? 'alert' : 'status')}>
       {icon ? <span className="status-icon">{icon}</span> : null}
       <div className="min-w-0 flex-1">
         {title ? <p className="text-sm font-semibold text-zinc-100">{title}</p> : null}
