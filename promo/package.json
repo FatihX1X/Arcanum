@@ -1,0 +1,27 @@
+{
+  "name": "arcanum-promo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Arcanum promo film built with Remotion (motion design in code).",
+  "scripts": {
+    "prestudio": "npm run audio",
+    "studio": "remotion studio",
+    "audio": "node scripts/generate-soundtrack.mjs",
+    "render": "npm run audio && remotion render ArcanumPromo out/arcanum-promo.mp4",
+    "still": "remotion still ArcanumPromo out/poster.png --frame=1830",
+    "stills": "node scripts/stills.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.535",
+    "react": "19.1.2",
+    "react-dom": "19.1.2",
+    "remotion": "4.0.535"
+  },
+  "devDependencies": {
+    "@remotion/bundler": "4.0.535",
+    "@remotion/renderer": "4.0.535",
+    "@types/react": "19.1.8",
+    "typescript": "5.6.3"
+  }
+}
