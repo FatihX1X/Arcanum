@@ -1,0 +1,14 @@
+{
+  "fps": 30,
+  "scenes": [
+    { "id": "intro", "from": 0, "duration": 180 },
+    { "id": "hook", "from": 180, "duration": 150 },
+    { "id": "pipeline", "from": 330, "duration": 270 },
+    { "id": "app", "from": 600, "duration": 300 },
+    { "id": "features", "from": 900, "duration": 540 },
+    { "id": "mainnet", "from": 1440, "duration": 240 },
+    { "id": "outro", "from": 1680, "duration": 210 }
+  ],
+  "featureDuration": 90,
+  "total": 1890
+}
